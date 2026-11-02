@@ -1,0 +1,552 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Playlist Builder — AccrediHub</title>
+<link rel="stylesheet" href="/theme.css">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Sora:wght@600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<script src="https://cdn.tailwindcss.com"></script>
+<script src="/app.js"></script>
+<script src="https://unpkg.com/alpinejs@3.x.x/dist/cdn.min.js" defer></script>
+<style>
+  .builder-grid { display: grid; grid-template-columns: 1fr 380px; gap: 28px; align-items: start; }
+  @media (max-width: 1100px) { .builder-grid { grid-template-columns: 1fr; } }
+  .playlist-panel { position: sticky; top: 20px; max-height: calc(100vh - 290px); min-height: 200px; overflow-y: auto; }
+  .item-row { display:flex; align-items:center; gap:10px; padding:8px 10px; border-radius: var(--radius-sm); background: var(--surface); border:1px solid var(--border-soft); margin-bottom:7px; }
+  .note-row { background: var(--accent-soft); }
+  .stats-bar { position: sticky; bottom: 0; z-index: 20; margin-top: 24px; padding: 12px 18px 14px; background: var(--surface); border: 1px solid var(--border-soft); border-radius: var(--radius-sm); box-shadow: 0 -6px 20px rgba(0,0,0,.18); }
+  .stats-row { display: flex; gap: 14px; margin-top: 12px; }
+  .stats-card { flex: 1 1 0; min-width: 0; display: flex; gap: 14px; align-items: flex-start; padding: 10px 12px; border: 1px solid var(--border-soft); border-radius: var(--radius-sm); }
+  .stats-legend { flex: 1; min-width: 0; max-height: 120px; overflow-y: auto; padding-top: 22px; }
+  @media (max-width: 900px) { .stats-row { flex-direction: column; } }
+  .reorder-btns { display:flex; flex-direction:column; gap:1px; }
+  .reorder-btns button { background:none; border:0; color: var(--text-faint); cursor:pointer; padding:1px; line-height:1; }
+  .reorder-btns button:hover { color: var(--text); }
+</style>
+</head>
+<body>
+<div class="app-shell">
+  <nav class="sidebar" id="sidebar"></nav>
+
+  <main class="main" x-data="builderPage()" x-init="init()" x-cloak>
+
+    <!-- No playlist chosen yet: create one -->
+    <template x-if="!playlist">
+      <div>
+        <div class="page-head"><div class="page-title">Playlist Builder</div></div>
+        <div class="panel" style="max-width:480px">
+          <p class="page-sub" style="margin-bottom:18px">Start a new playlist for an upcoming radio show.</p>
+          <label class="field-label">Show / playlist name</label>
+          <input class="input" style="margin-bottom:14px" x-model="newPl.name" placeholder="e.g. Friday Night Session">
+          <label class="field-label">Show date</label>
+          <input class="input" type="date" style="margin-bottom:14px" x-model="newPl.show_date">
+          <label class="field-label">Theme (optional)</label>
+          <input class="input" style="margin-bottom:18px" x-model="newPl.theme" placeholder="e.g. New Wave Revival">
+          <button class="btn btn-primary" @click="createPlaylist()" :disabled="!newPl.name || creating" x-text="creating ? 'Creating…' : 'Create playlist'"></button>
+          <div class="page-sub" style="margin-top:20px" x-show="recentPlaylists.length">Or continue an unfinished one:</div>
+          <template x-for="p in recentPlaylists" :key="p.id">
+            <a :href="'/playlist-builder.html?id=' + p.id" class="track-row" style="margin-top:8px;display:flex">
+              <div class="track-main"><div class="track-title" x-text="p.name"></div><div class="track-meta" x-text="SR.fmtDate(p.show_date)"></div></div>
+              <div class="track-col" x-text="p.track_count + ' tracks'"></div>
+            </a>
+          </template>
+        </div>
+      </div>
+    </template>
+
+    <template x-if="playlist">
+      <div>
+        <div class="page-head">
+          <div>
+            <div class="page-title" x-text="playlist.name"></div>
+            <div class="page-sub">
+              <span x-text="SR.fmtDate(playlist.show_date) || 'No date set'"></span>
+              <template x-if="playlist.theme"><span> · Theme: <span x-text="playlist.theme"></span></span></template>
+            </div>
+          </div>
+          <div style="display:flex;gap:10px;flex-wrap:wrap">
+            <button class="btn btn-ghost" @click="editMetaOpen = true">Edit details</button>
+            <button class="btn btn-ghost" @click="openNoteForm()">+ Add show note</button>
+            <a href="/playlists.html" class="btn btn-primary">Done — view all playlists</a>
+          </div>
+        </div>
+
+        <div class="builder-grid">
+          <!-- Library / feed -->
+          <div>
+            <div style="display:flex;gap:12px;margin-bottom:22px;flex-wrap:wrap;align-items:center">
+              <div class="search-wrap" style="flex:1;min-width:220px">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+                <input class="input" placeholder="Search title, artist, album or theme…" x-model="q" @input="onFilterChange()">
+              </div>
+              <div style="display:flex;align-items:center;gap:8px">
+                <label class="field-label" style="margin:0;white-space:nowrap">Hide if played within</label>
+                <input class="input" type="number" min="0" style="width:70px" x-model.number="weeks" @input="onFilterChange()">
+                <span class="page-sub" style="margin:0">weeks</span>
+              </div>
+              <label style="display:flex;align-items:center;gap:8px;font-size:13.5px;cursor:pointer;white-space:nowrap">
+                <input type="checkbox" x-model="navidromeOnly" @change="onFilterChange()" style="width:16px;height:16px">
+                Tracks available on Navidrome
+              </label>
+            </div>
+
+            <template x-if="feedLoading"><div class="page-sub">Loading library…</div></template>
+
+            <template x-if="!feedLoading">
+              <div>
+                <template x-for="section in sections" :key="section.key">
+                  <div class="section" x-show="section.items.length">
+                    <div class="section-head" style="cursor:pointer;user-select:none" @click="toggleSection(section.key)">
+                      <div style="display:flex;align-items:center;gap:10px">
+                        <div class="month-chevron" :class="{open: isSectionOpen(section.key)}">
+                          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 6 15 12 9 18"/></svg>
+                        </div>
+                        <div class="section-title" x-text="section.title"></div>
+                      </div>
+                      <span class="section-count" x-text="section.items.length"></span>
+                    </div>
+                    <template x-for="group in (isSectionOpen(section.key) ? groupByArtist(section.items) : [])" :key="section.key + '-' + group.key">
+                      <div class="panel month-group">
+                        <div class="month-header" @click="toggleArtistGroup(section.key + '-' + group.key)">
+                          <div style="display:flex;align-items:center;gap:10px">
+                            <div class="month-chevron" :class="{open: isArtistGroupExpanded(section.key + '-' + group.key)}">
+                              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 6 15 12 9 18"/></svg>
+                            </div>
+                            <div class="month-title" x-text="group.name"></div>
+                          </div>
+                          <div class="pill" x-text="group.items.length + ' track' + (group.items.length === 1 ? '' : 's')"></div>
+                        </div>
+                        <div class="month-body" x-show="isArtistGroupExpanded(section.key + '-' + group.key)" x-cloak>
+                          <template x-for="t in group.items" :key="section.key + '-' + t.id">
+                            <div class="track-row" :class="{ 'is-navidrome-only': t.navidrome_only }" :title="t.navidrome_only ? 'In Navidrome but not yet added to AccrediHub' : ''">
+                              <div class="art" :style="t.album_art_url ? 'background-image:url(' + t.album_art_url + ')' : ''"></div>
+                              <div class="track-main">
+                                <div class="track-title" x-text="t.title"></div>
+                                <div class="track-meta" style="display:flex;align-items:center;gap:5px">
+                                  <span x-text="t.artist_name"></span>
+                                  <template x-if="t.is_ai_artist">
+                                    <span title="AI Artist" style="display:inline-flex;color:#e0a721;flex-shrink:0">
+                                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="12" height="12"><path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0Z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+                                    </span>
+                                  </template>
+                                  <span x-show="t.album_name" x-text="'· ' + t.album_name"></span>
+                                </div>
+                                <div x-show="t.themes && t.themes.length" style="display:flex;flex-wrap:wrap;gap:4px;margin-top:4px">
+                                  <template x-for="th in (t.themes || [])" :key="th.id">
+                                    <span class="pill pill-theme" x-text="th.name"></span>
+                                  </template>
+                                </div>
+                              </div>
+                              <div class="track-col" x-text="SR.fmtDate(t.release_date) || '—'"></div>
+                              <template x-if="t.navidrome_url">
+                                <a :href="t.navidrome_url" target="_blank" class="icon-btn" title="Play in Navidrome" style="color:#22c55e" @click.stop>
+                                  <svg viewBox="0 0 24 24" fill="currentColor" stroke="none"><polygon points="6 3 20 12 6 21 6 3"/></svg>
+                                </a>
+                              </template>
+                              <button class="btn btn-primary btn-sm" @click="addTrack(t)">Add</button>
+                            </div>
+                          </template>
+                        </div>
+                      </div>
+                    </template>
+                  </div>
+                </template>
+                <template x-if="sections.every(s => s.items.length === 0)">
+                  <div class="empty-state panel">Nothing matches your filters.</div>
+                </template>
+              </div>
+            </template>
+          </div>
+
+          <!-- Current playlist -->
+          <div class="playlist-panel panel">
+            <div class="section-title" style="margin-bottom:14px">This Playlist</div>
+            <template x-if="items.length === 0">
+              <div style="color:var(--text-faint);font-size:13px">Nothing added yet — add tracks or a show note from the left.</div>
+            </template>
+            <template x-for="(it, idx) in items" :key="it.id">
+              <div class="item-row" :class="it.item_type === 'note' && 'note-row'">
+                <div class="reorder-btns">
+                  <button @click="move(idx, -1)" :disabled="idx === 0">▲</button>
+                  <button @click="move(idx, 1)" :disabled="idx === items.length - 1">▼</button>
+                </div>
+                <template x-if="it.item_type === 'track'">
+                  <div style="flex:1;min-width:0">
+                    <div class="track-title" style="font-size:13.5px" x-text="it.title"></div>
+                    <div class="track-meta" style="display:flex;align-items:center;gap:5px">
+                      <span x-text="it.artist_name"></span>
+                      <template x-if="it.is_ai_artist">
+                        <span title="AI Artist" style="display:inline-flex;color:#e0a721;flex-shrink:0">
+                          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="11" height="11"><path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0Z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+                        </span>
+                      </template>
+                    </div>
+                  </div>
+                </template>
+                <template x-if="it.item_type === 'note'">
+                  <div style="flex:1;min-width:0">
+                    <div class="track-title" style="font-size:13.5px;display:flex;align-items:center;gap:7px">
+                      <span x-text="'📝 ' + it.note_title"></span>
+                      <span class="pill" :class="SR.noteCategoryPillClass(it.category)" x-show="it.category" x-text="SR.noteCategoryLabel(it.category)"></span>
+                    </div>
+                    <div class="track-meta" x-text="it.note_body"></div>
+                    <div x-show="it.themes && it.themes.length" style="display:flex;flex-wrap:wrap;gap:4px;margin-top:4px">
+                      <template x-for="th in (it.themes || [])" :key="th.id">
+                        <span class="pill pill-theme" x-text="th.name"></span>
+                      </template>
+                    </div>
+                  </div>
+                </template>
+                <div class="icon-btn" style="width:26px;height:26px" @click="removeItem(it)">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="12" height="12"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+                </div>
+              </div>
+            </template>
+
+            </div>
+        </div>
+
+        <!-- Playlist statistics: pinned along the bottom of the screen, recomputed from `items` on every add / remove / reorder -->
+        <div class="stats-bar" x-show="items.length" x-cloak>
+          <div style="display:flex;align-items:center;justify-content:space-between;cursor:pointer;user-select:none" @click="statsOpen = !statsOpen">
+            <div style="display:flex;align-items:center;gap:8px">
+              <div class="month-chevron" :class="{open: statsOpen}"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 6 15 12 9 18"/></svg></div>
+              <div class="section-title" style="font-size:15px">Playlist Statistics</div>
+            </div>
+            <span class="section-count" x-text="stats.tracks + ' track' + (stats.tracks === 1 ? '' : 's') + (stats.notes ? ' · ' + stats.notes + ' note' + (stats.notes === 1 ? '' : 's') : '')"></span>
+          </div>
+          <div x-show="statsOpen" x-cloak class="stats-row">
+            <template x-for="grp in stats.groups" :key="grp.title">
+              <div class="stats-card" x-show="grp.rows.length">
+                <div style="flex-shrink:0">
+                  <div class="field-label" style="margin-bottom:6px" x-text="grp.title"></div>
+                  <div :style="pieStyle(grp.rows)"></div>
+                </div>
+                <div class="stats-legend">
+                  <template x-for="r in grp.rows" :key="grp.title + r.label">
+                    <div style="display:flex;align-items:center;gap:7px;font-size:12px;margin-bottom:2px">
+                      <span :style="{ width: '10px', height: '10px', borderRadius: '2px', flexShrink: '0', background: r.color }"></span>
+                      <span style="flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" :title="r.label" x-text="r.label"></span>
+                      <span style="color:var(--text-dim);flex-shrink:0" x-text="r.count + ' (' + r.share + '%)'"></span>
+                    </div>
+                  </template>
+                </div>
+              </div>
+            </template>
+          </div>
+        </div>
+      </div>
+    </template>
+
+    <!-- Add show-note modal -->
+    <div class="modal-backdrop" x-show="noteFormOpen" x-cloak @click.self="noteFormOpen = false">
+      <div class="modal">
+        <div class="modal-title">Add Show Note</div>
+        <p class="page-sub" style="margin-bottom:16px">For topics to discuss, features, or adverts — anything that isn't a track.</p>
+        <form @submit.prevent="addNote()">
+          <label class="field-label">Category</label>
+          <select class="input" style="margin-bottom:14px" x-model="noteForm.category" @change="onNoteCategoryChange()" required>
+            <option value="" disabled>Select a category…</option>
+            <option value="new_tour_announcement">New Tour Announcement</option>
+            <option value="band_on_tour">Band On Tour</option>
+            <option value="news">News</option>
+            <option value="competition">Competition</option>
+            <option value="show_feature">Show Feature</option>
+          </select>
+          <template x-if="noteForm.category === 'new_tour_announcement' || noteForm.category === 'band_on_tour'">
+            <div>
+              <label class="field-label">Band</label>
+              <select class="input" style="margin-bottom:14px" x-model="noteForm.artist_id" @change="onNoteArtistChange()" required>
+                <option value="" disabled>Select a band…</option>
+                <template x-for="a in noteBandOptions" :key="a.id">
+                  <option :value="a.id" x-text="a.name"></option>
+                </template>
+              </select>
+              <div class="page-sub" style="margin:-8px 0 14px" x-show="!noteBandsLoading && noteBandOptions.length === 0">
+                <span x-show="noteForm.category === 'new_tour_announcement'">No bands have had new tour dates added in the past 7 days.</span>
+                <span x-show="noteForm.category === 'band_on_tour'">No bands have tour dates scheduled in the next 30 days.</span>
+              </div>
+              <template x-if="noteForm.artist_id">
+                <div style="margin-bottom:14px">
+                  <label class="field-label">Upcoming tour dates</label>
+                  <div style="max-height:170px;overflow-y:auto;border:1px solid var(--border);border-radius:10px;padding:4px 10px">
+                    <template x-for="d in noteBandTourDates" :key="d.event_date + (d.venue || '') + (d.city || '')">
+                      <div style="display:flex;justify-content:space-between;gap:10px;font-size:13px;padding:7px 0;border-bottom:1px solid var(--border)">
+                        <span x-text="SR.fmtDate(d.event_date)" style="flex-shrink:0;font-weight:600"></span>
+                        <span x-text="(d.venue || 'Venue TBA') + (d.city ? ', ' + d.city : '')" style="text-align:right"></span>
+                      </div>
+                    </template>
+                    <div class="page-sub" style="padding:8px 0" x-show="!noteBandDatesLoading && noteBandTourDates.length === 0">No upcoming tour dates found.</div>
+                  </div>
+                </div>
+              </template>
+            </div>
+          </template>
+          <template x-if="noteForm.category !== 'new_tour_announcement' && noteForm.category !== 'band_on_tour'">
+            <div>
+              <label class="field-label">Title</label>
+              <input class="input" style="margin-bottom:14px" x-model="noteForm.note_title" required placeholder="e.g. Ad break — sponsor mention">
+            </div>
+          </template>
+          <template x-if="(noteForm.category === 'new_tour_announcement' || noteForm.category === 'band_on_tour') && noteForm.note_title">
+            <div class="page-sub" style="margin:-6px 0 14px">Title: <strong x-text="noteForm.note_title"></strong></div>
+          </template>
+          <label class="field-label">Details (optional)</label>
+          <textarea class="input" style="margin-bottom:16px;min-height:90px" x-model="noteForm.note_body" placeholder="Talking points…"></textarea>
+          <div style="display:flex;justify-content:flex-end;gap:10px">
+            <button type="button" class="btn btn-ghost" @click="noteFormOpen = false">Cancel</button>
+            <button type="submit" class="btn btn-primary">Add</button>
+          </div>
+        </form>
+      </div>
+    </div>
+
+    <!-- Edit playlist meta modal -->
+    <div class="modal-backdrop" x-show="editMetaOpen" x-cloak @click.self="editMetaOpen = false">
+      <div class="modal">
+        <div class="modal-title">Edit Playlist Details</div>
+        <form @submit.prevent="saveMeta()">
+          <label class="field-label">Name</label>
+          <input class="input" style="margin-bottom:14px" x-model="metaForm.name" required>
+          <label class="field-label">Show date</label>
+          <input class="input" type="date" style="margin-bottom:14px" x-model="metaForm.show_date">
+          <label class="field-label">Theme</label>
+          <input class="input" style="margin-bottom:16px" x-model="metaForm.theme">
+          <div style="display:flex;justify-content:flex-end;gap:10px">
+            <button type="button" class="btn btn-ghost" @click="editMetaOpen = false">Cancel</button>
+            <button type="submit" class="btn btn-primary">Save</button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </main>
+</div>
+
+<script>
+const PIE_COLORS = ['#7c5cff', '#22c55e', '#f59e0b', '#ef4444', '#06b6d4', '#ec4899', '#84cc16', '#f97316', '#64748b', '#a855f7', '#14b8a6', '#eab308'];
+function builderPage() {
+  return {
+    playlist: null, items: [], recentPlaylists: [],
+    newPl: { name: '', show_date: '', theme: '' }, creating: false,
+    q: '', weeks: null, navidromeOnly: false, feedLoading: false,
+    sections: [
+      { key: 'new_releases', title: 'New Releases', items: [] },
+      { key: 'touring_soon', title: 'Touring in the Next Month', items: [] },
+      { key: 'favourites', title: 'Favourites', items: [] },
+      { key: 'others', title: 'Artists', items: [] },
+    ],
+    // New Releases, Touring and Artists load collapsed; Favourites stays open.
+    collapsedSections: { new_releases: true, touring_soon: true, favourites: false, others: true },
+    statsOpen: true,
+    isSectionOpen(key) { return !this.collapsedSections[key]; },
+    toggleSection(key) { this.collapsedSections[key] = !this.collapsedSections[key]; },
+    get stats() {
+      const tracks = this.items.filter(i => i.item_type === 'track');
+      const notes = this.items.filter(i => i.item_type === 'note');
+      const n = tracks.length;
+      const cutoff = new Date(Date.now() - 60 * 864e5).toISOString().slice(0, 10);
+      const rows = (counts, opts = {}) => {
+        let arr = Object.entries(counts).map(([label, count]) => ({ label, count }));
+        arr.sort(opts.byLabel ? (a, b) => a.label.localeCompare(b.label) : (a, b) => b.count - a.count || a.label.localeCompare(b.label));
+        if (opts.limit) arr = arr.slice(0, opts.limit);
+        const max = Math.max(1, ...arr.map(r => r.count));
+        return arr.map(r => ({ ...r, pct: Math.round(r.count / max * 100), share: n ? Math.round(r.count / n * 100) : 0 }));
+      };
+      const bump = (o, k) => { o[k] = (o[k] || 0) + 1; };
+      const year = {}, decade = {}, theme = {}, artist = {}, avail = {}, kind = {}, noteCat = {};
+      let untagged = 0;
+      for (const t of tracks) {
+        const y = t.release_date ? String(t.release_date).slice(0, 4) : null;
+        bump(year, y || 'Unknown');
+        bump(decade, y ? y.slice(0, 3) + '0s' : 'Unknown');
+        if (t.themes && t.themes.length) t.themes.forEach(th => bump(theme, th.name)); else untagged++;
+        bump(artist, t.artist_name || 'Unknown');
+        bump(avail, (t.on_navidrome || t.navidrome_song_id) ? 'On Navidrome' : 'Not on Navidrome');
+        // Each track counts once, in the first category that applies.
+        if (t.release_date && String(t.release_date).slice(0, 10) >= cutoff) bump(kind, 'New release');
+        else if (t.is_favourite) bump(kind, 'Favourite');
+        else if (t.touring_soon) bump(kind, 'Artist touring soon');
+        else if (t.is_ai_artist) bump(kind, 'AI artist');
+        else bump(kind, 'Back catalogue');
+      }
+      // Top 7 artists plus an "Other" slice so the pie adds up to the whole playlist.
+      const artistSorted = Object.entries(artist).sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]));
+      const artistTop = {};
+      artistSorted.slice(0, 7).forEach(([k, v]) => { artistTop[k] = v; });
+      const otherCount = artistSorted.slice(7).reduce((s, [, v]) => s + v, 0);
+      if (otherCount) artistTop['Other'] = otherCount;
+      if (untagged && Object.keys(theme).length) theme['(No theme)'] = untagged;
+      for (const nt of notes) bump(noteCat, nt.category ? SR.noteCategoryLabel(nt.category) : 'Other');
+      const uniqueArtists = Object.keys(artist).length;
+      return {
+        tracks: n, notes: notes.length,
+        groups: [
+          { title: 'By release year', rows: rows(year, { byLabel: true }) },
+          { title: 'By artist (' + uniqueArtists + ' unique)', rows: rows(artistTop) },
+          { title: 'Track type', rows: rows(kind, {}) },
+        ].map(g => ({ ...g, rows: g.rows.map((r, i) => ({ ...r, color: PIE_COLORS[i % PIE_COLORS.length] })) })),
+      };
+    },
+    pieStyle(rows) {
+      const total = rows.reduce((s, r) => s + r.count, 0) || 1;
+      let acc = 0;
+      const stops = rows.map(r => {
+        const from = acc / total * 100; acc += r.count; const to = acc / total * 100;
+        return r.color + ' ' + from.toFixed(2) + '% ' + to.toFixed(2) + '%';
+      });
+      return { width: '88px', height: '88px', borderRadius: '50%', flexShrink: '0', background: 'conic-gradient(' + stops.join(',') + ')' };
+    },
+    noteFormOpen: false, noteForm: { category: '', note_title: '', note_body: '', artist_id: '' },
+    noteBandOptions: [], noteBandsLoading: false,
+    noteBandTourDates: [], noteBandDatesLoading: false,
+    editMetaOpen: false, metaForm: { name: '', show_date: '', theme: '' },
+    expandedArtistGroups: {},
+
+    async init() {
+      const user = await SR.requireAuth();
+      if (!user) return;
+      SR.mountSidebar('builder', user);
+      try { const pr = await SR.api('/profile'); if (pr.profile && pr.profile.default_weeks) this.weeks = pr.profile.default_weeks; } catch (e) {}
+      const id = new URLSearchParams(location.search).get('id');
+      if (id) {
+        await this.loadPlaylist(id);
+      } else {
+        try { const r = await SR.api('/playlists'); this.recentPlaylists = (r.playlists || []).slice(0, 5); } catch (e) {}
+      }
+    },
+    async createPlaylist() {
+      this.creating = true;
+      try {
+        const r = await SR.api('/playlists', { method: 'POST', body: this.newPl });
+        history.replaceState(null, '', '/playlist-builder.html?id=' + r.playlist.id);
+        await this.loadPlaylist(r.playlist.id);
+      } catch (e) { SR.toast(e.message); }
+      this.creating = false;
+    },
+    async loadPlaylist(id) {
+      try {
+        const r = await SR.api('/playlists/' + id);
+        this.playlist = r.playlist;
+        this.items = r.items;
+        this.metaForm = { name: r.playlist.name, show_date: r.playlist.show_date || '', theme: r.playlist.theme || '' };
+        await this.loadFeed();
+      } catch (e) { SR.toast(e.message); }
+    },
+    async loadFeed() {
+      this.feedLoading = true;
+      try {
+        const excludeIds = this.items.filter(i => i.track_id).map(i => i.track_id);
+        const params = new URLSearchParams();
+        if (this.q) params.set('q', this.q);
+        if (this.weeks) params.set('weeks', this.weeks);
+        if (this.navidromeOnly) params.set('navidrome_only', '1');
+        if (excludeIds.length) params.set('exclude', excludeIds.join(','));
+        const r = await SR.api('/playlist-data?' + params.toString());
+        this.sections[0].items = r.new_releases || [];
+        this.sections[1].items = r.touring_soon || [];
+        this.sections[2].items = r.favourites || [];
+        this.sections[3].items = r.others || [];
+        // When searching, open every section so matches (including theme matches) are visible.
+        if (this.q) Object.keys(this.collapsedSections).forEach(k => { this.collapsedSections[k] = false; });
+      } catch (e) { SR.toast(e.message); }
+      this.feedLoading = false;
+    },
+    onFilterChange: SR.debounce(function () { this.loadFeed(); }, 350),
+    groupByArtist(items) {
+      const groups = {};
+      for (const t of items) {
+        const key = t.artist_id;
+        if (!groups[key]) groups[key] = { key, name: t.artist_name, items: [] };
+        groups[key].items.push(t);
+      }
+      return Object.values(groups).sort((a, b) => a.name.localeCompare(b.name));
+    },
+    toggleArtistGroup(key) { this.expandedArtistGroups[key] = !this.expandedArtistGroups[key]; },
+    isArtistGroupExpanded(key) { return !!this.expandedArtistGroups[key]; },
+    async addTrack(t) {
+      try {
+        const r = await SR.api('/playlists/' + this.playlist.id + '/items', { method: 'POST', body: { item_type: 'track', track_id: t.id } });
+        this.items.push({ id: r.id, item_type: 'track', track_id: t.id, title: t.title, artist_name: t.artist_name, album_name: t.album_name, is_ai_artist: t.is_ai_artist,
+          release_date: t.release_date, themes: t.themes || [], on_navidrome: !!t.navidrome_song_id, is_favourite: !!t.is_favourite, touring_soon: !!t.touring_soon });
+        this.sections.forEach(s => { s.items = s.items.filter(x => x.id !== t.id); });
+      } catch (e) { SR.toast(e.message); }
+    },
+    openNoteForm() {
+      this.noteForm = { category: '', note_title: '', note_body: '', artist_id: '' };
+      this.noteBandOptions = [];
+      this.noteBandTourDates = [];
+      this.noteFormOpen = true;
+    },
+    async onNoteCategoryChange() {
+      this.noteForm.artist_id = '';
+      this.noteForm.note_title = '';
+      this.noteBandOptions = [];
+      this.noteBandTourDates = [];
+      const category = this.noteForm.category;
+      if (category !== 'new_tour_announcement' && category !== 'band_on_tour') return;
+      this.noteBandsLoading = true;
+      try {
+        const r = await SR.api('/note-bands?category=' + category);
+        this.noteBandOptions = r.artists || [];
+      } catch (e) { SR.toast(e.message); }
+      this.noteBandsLoading = false;
+    },
+    async onNoteArtistChange() {
+      this.noteBandTourDates = [];
+      if (!this.noteForm.artist_id) return;
+      const artist = this.noteBandOptions.find((a) => String(a.id) === String(this.noteForm.artist_id));
+      this.noteForm.note_title = SR.noteCategoryLabel(this.noteForm.category) + (artist ? ' — ' + artist.name : '');
+      this.noteBandDatesLoading = true;
+      try {
+        const r = await SR.api('/note-bands?category=' + this.noteForm.category + '&artist_id=' + this.noteForm.artist_id);
+        this.noteBandTourDates = r.tour_dates || [];
+      } catch (e) { SR.toast(e.message); }
+      this.noteBandDatesLoading = false;
+    },
+    async addNote() {
+      if (!this.noteForm.note_title) {
+        SR.toast('Please add a title' + ((this.noteForm.category === 'new_tour_announcement' || this.noteForm.category === 'band_on_tour') ? ' by selecting a band.' : '.'));
+        return;
+      }
+      try {
+        const body = { item_type: 'note', category: this.noteForm.category, note_title: this.noteForm.note_title, note_body: this.noteForm.note_body, artist_id: this.noteForm.artist_id || null };
+        const r = await SR.api('/playlists/' + this.playlist.id + '/items', { method: 'POST', body });
+        this.items.push({ id: r.id, item_type: 'note', category: this.noteForm.category, note_title: this.noteForm.note_title, note_body: this.noteForm.note_body, artist_id: this.noteForm.artist_id || null });
+        this.noteFormOpen = false;
+        this.noteForm = { category: '', note_title: '', note_body: '', artist_id: '' };
+        this.noteBandOptions = [];
+        this.noteBandTourDates = [];
+      } catch (e) { SR.toast(e.message); }
+    },
+    async removeItem(it) {
+      try {
+        await SR.api('/playlists/' + this.playlist.id + '/items', { method: 'DELETE', body: { item_id: it.id } });
+        this.items = this.items.filter(x => x.id !== it.id);
+        await this.loadFeed();
+      } catch (e) { SR.toast(e.message); }
+    },
+    move(idx, dir) {
+      const j = idx + dir;
+      if (j < 0 || j >= this.items.length) return;
+      const arr = this.items;
+      [arr[idx], arr[j]] = [arr[j], arr[idx]];
+      this.persistOrder();
+    },
+    async persistOrder() {
+      try { await SR.api('/playlists/' + this.playlist.id + '/items', { method: 'PUT', body: { order: this.items.map(i => i.id) } }); }
+      catch (e) { SR.toast(e.message); }
+    },
+    async saveMeta() {
+      try {
+        const r = await SR.api('/playlists/' + this.playlist.id, { method: 'PUT', body: this.metaForm });
+        this.playlist = r.playlist;
+        this.editMetaOpen = false;
+      } catch (e) { SR.toast(e.message); }
+    },
+  };
+}
+</script>
+</body>
+</html>

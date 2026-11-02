@@ -1,0 +1,182 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Artists — AccrediHub</title>
+<link rel="stylesheet" href="/theme.css">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Sora:wght@600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<script src="https://cdn.tailwindcss.com"></script>
+<script src="/app.js"></script>
+<script src="https://unpkg.com/alpinejs@3.x.x/dist/cdn.min.js" defer></script>
+</head>
+<body>
+<div class="app-shell">
+  <nav class="sidebar" id="sidebar"></nav>
+
+  <main class="main" x-data="artistsPage()" x-init="init()" x-cloak>
+    <div class="page-head">
+      <div>
+        <div class="page-title">Artists</div>
+        <div class="page-sub" x-text="loading ? 'Loading…' : (artists.length + ' artist' + (artists.length === 1 ? '' : 's'))"></div>
+      </div>
+      <div style="display:flex;gap:10px;flex-wrap:wrap">
+        <button class="btn btn-primary" @click="openAdd()">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+          Add Artist
+        </button>
+      </div>
+    </div>
+
+    <div style="display:flex;gap:14px;flex-wrap:wrap;margin-bottom:26px">
+      <div class="search-wrap" style="max-width:420px;flex:1">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+        <input class="input" placeholder="Search artists…" x-model="q" @input="onSearch()">
+      </div>
+      <select class="input" style="max-width:220px" x-model="sort">
+        <option value="name">Sort: A–Z</option>
+        <option value="tracks">Sort: Most tracks</option>
+        <option value="tours">Sort: Most tour dates</option>
+      </select>
+    </div>
+
+    <template x-if="!loading && artists.length === 0">
+      <div class="empty-state panel">
+        <p x-text="q ? 'No artists match “' + q + '”.' : 'No artists yet — add one to get started.'"></p>
+      </div>
+    </template>
+
+    <div class="grid">
+      <template x-for="a in sortedArtists" :key="a.id">
+        <a class="artist-card fade-in" :href="'/artist.html?id=' + a.id">
+          <div class="artist-photo" :style="a.photo_url ? 'background-image:url(' + a.photo_url + ');background-size:cover;background-position:center' : ''">
+            <template x-if="!a.photo_url"><span x-text="SR.initials(a.name)"></span></template>
+          </div>
+          <div class="artist-card-name" style="display:flex;align-items:center;justify-content:center;gap:6px">
+            <span x-text="a.name"></span>
+            <template x-if="a.is_ai_artist">
+              <span title="AI Artist" style="display:inline-flex;color:#e0a721;flex-shrink:0">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="15" height="15"><path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0Z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+              </span>
+            </template>
+            <template x-if="a.is_profile_complete">
+              <span title="Artist Profile Complete" style="display:inline-flex;color:#22c55e;flex-shrink:0">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" width="15" height="15"><path d="M20 6 9 17l-5-5"/></svg>
+              </span>
+            </template>
+          </div>
+          <div class="artist-card-count" x-text="a.track_count + ' track' + (a.track_count === 1 ? '' : 's') + ' · ' + a.upcoming_tour_count + ' upcoming date' + (a.upcoming_tour_count === 1 ? '' : 's')"></div>
+        </a>
+      </template>
+    </div>
+
+    <div class="modal-backdrop" x-show="formOpen" x-cloak @click.self="formOpen = false">
+      <div class="modal">
+        <div class="modal-title">Add Artist</div>
+        <form @submit.prevent="save()">
+          <label class="field-label">Name</label>
+          <input class="input" style="margin-bottom:14px" x-model="form.name" required placeholder="Artist name">
+          <label class="field-label">Bio (optional)</label>
+          <textarea class="input" style="margin-bottom:14px;min-height:80px" x-model="form.bio" placeholder="A short bio…"></textarea>
+          <label class="field-label">Photo</label>
+          <div style="display:flex;gap:10px;align-items:center;margin-bottom:16px">
+            <input class="input" x-model="form.photo_url" placeholder="Image URL, or upload →" style="flex:1">
+            <input type="file" accept="image/*" x-ref="photoFile" @change="uploadPhoto($event)" style="display:none">
+            <button type="button" class="btn btn-ghost btn-sm" @click="$refs.photoFile.click()" :disabled="uploading" x-text="uploading ? '…' : 'Upload'"></button>
+          </div>
+          <label class="field-label">PR Agency (optional)</label>
+          <input class="input" style="margin-bottom:14px" x-model="form.pr_agency_company" placeholder="Agency / company name" list="agency-suggestions">
+          <datalist id="agency-suggestions">
+            <template x-for="ag in allAgencies" :key="ag.id"><option :value="ag.company"></option></template>
+          </datalist>
+          <template x-if="form.pr_agency_company">
+            <div style="display:flex;gap:10px;margin-bottom:16px">
+              <input class="input" x-model="form.pr_contact_name" placeholder="Contact name (optional)">
+              <input class="input" x-model="form.pr_contact_email" placeholder="Contact email (optional)">
+            </div>
+          </template>
+          <div style="display:flex;justify-content:flex-end;gap:10px">
+            <button type="button" class="btn btn-ghost" @click="formOpen = false">Cancel</button>
+            <button type="submit" class="btn btn-primary" :disabled="saving" x-text="saving ? 'Saving…' : 'Save'"></button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </main>
+</div>
+
+<script>
+function artistsPage() {
+  return {
+    artists: [], q: '', sort: 'name', loading: true, formOpen: false, saving: false, uploading: false,
+    form: { name: '', bio: '', photo_url: '', pr_agency_company: '', pr_contact_name: '', pr_contact_email: '' },
+    allAgencies: [],
+    async loadAgencies() {
+      try { const r = await SR.api('/pr-agencies'); this.allAgencies = r.agencies || []; } catch (e) {}
+    },
+    get sortedArtists() {
+      const list = this.artists.slice();
+      if (this.sort === 'tracks') list.sort((a, b) => b.track_count - a.track_count || a.name.localeCompare(b.name));
+      else if (this.sort === 'tours') list.sort((a, b) => b.upcoming_tour_count - a.upcoming_tour_count || a.name.localeCompare(b.name));
+      else list.sort((a, b) => a.name.localeCompare(b.name));
+      return list;
+    },
+    async init() {
+      const user = await SR.requireAuth();
+      if (!user) return;
+      SR.mountSidebar('artists', user);
+      await this.load();
+      await this.loadAgencies();
+    },
+    async load() {
+      this.loading = true;
+      try {
+        const r = await SR.api('/artists' + (this.q ? '?q=' + encodeURIComponent(this.q) : ''));
+        this.artists = r.artists || [];
+      } catch (e) { SR.toast(e.message); }
+      this.loading = false;
+    },
+    onSearch: SR.debounce(function () { this.load(); }, 300),
+    openAdd() { this.form = { name: '', bio: '', photo_url: '', pr_agency_company: '', pr_contact_name: '', pr_contact_email: '' }; this.formOpen = true; },
+    async uploadPhoto(e) {
+      const file = e.target.files[0];
+      if (!file) return;
+      this.uploading = true;
+      try {
+        const fd = new FormData();
+        fd.append('file', file);
+        fd.append('kind', 'artist');
+        const r = await SR.api('/uploads', { method: 'POST', body: fd });
+        this.form.photo_url = r.url;
+      } catch (err) { SR.toast(err.message); }
+      this.uploading = false;
+    },
+    async save() {
+      this.saving = true;
+      try {
+        const r = await SR.api('/artists', { method: 'POST', body: { name: this.form.name, bio: this.form.bio, photo_url: this.form.photo_url } });
+        const company = (this.form.pr_agency_company || '').trim();
+        if (company && r.artist) {
+          const agencyRes = await SR.api('/pr-agencies', { method: 'POST', body: { company } });
+          const agencyId = agencyRes.agency.id;
+          let contactId = null;
+          const contactName = (this.form.pr_contact_name || '').trim();
+          if (contactName) {
+            const contactRes = await SR.api('/pr-contacts', { method: 'POST', body: { agency_id: agencyId, name: contactName, email: this.form.pr_contact_email } });
+            contactId = contactRes.contact.id;
+          }
+          await SR.api('/artist-pr-contacts', { method: 'POST', body: { artist_id: r.artist.id, agency_id: agencyId, contact_id: contactId } });
+        }
+        this.formOpen = false;
+        await this.load();
+        await this.loadAgencies();
+        SR.toast('Artist added.');
+      } catch (e) { SR.toast(e.message); }
+      this.saving = false;
+    },
+  };
+}
+</script>
+</body>
+</html>

@@ -1,0 +1,320 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>All Songs — AccrediHub</title>
+<link rel="stylesheet" href="/theme.css">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Sora:wght@600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<script src="https://cdn.tailwindcss.com"></script>
+<script src="/app.js"></script>
+<script src="https://unpkg.com/alpinejs@3.x.x/dist/cdn.min.js" defer></script>
+</head>
+<body>
+<div class="app-shell">
+  <nav class="sidebar" id="sidebar"></nav>
+
+  <main class="main" x-data="songsPage()" x-init="init()" x-cloak>
+    <div class="page-head">
+      <div>
+        <div class="page-title">All Songs</div>
+        <div class="page-sub" x-text="loading ? 'Loading your library…' : (total + ' track' + (total === 1 ? '' : 's'))"></div>
+      </div>
+      <div style="display:flex;gap:10px;flex-wrap:wrap">
+        <button class="btn btn-primary" @click="openAdd()">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+          Add Track
+        </button>
+      </div>
+    </div>
+
+    <div style="display:flex;gap:14px;flex-wrap:wrap;margin-bottom:22px">
+      <div class="search-wrap" style="max-width:420px;flex:1;min-width:240px">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+        <input class="input" placeholder="Search by title, artist, or album…" x-model="q" @input="onSearch()">
+      </div>
+
+      <div style="max-width:420px;flex:1;min-width:240px">
+        <div class="chip-input-row">
+          <template x-for="th in selectedThemeFilters" :key="th.id">
+            <span class="pill pill-theme pill-removable" @click="removeThemeFilter(th)" title="Remove filter">
+              <span x-text="th.name"></span>
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+            </span>
+          </template>
+          <input placeholder="Filter by theme…" x-model="themeFilterInput" list="theme-filter-suggestions"
+                 @change="commitThemeFilter()" @keydown.enter.prevent="commitThemeFilter()">
+        </div>
+        <datalist id="theme-filter-suggestions">
+          <template x-for="th in allThemes" :key="th.id"><option :value="th.name"></option></template>
+        </datalist>
+      </div>
+
+      <label style="display:flex;align-items:center;gap:8px;font-size:13.5px;cursor:pointer;white-space:nowrap">
+        <input type="checkbox" x-model="navidromeOnly" @change="onSearch()" style="width:16px;height:16px">
+        Tracks available on Navidrome
+      </label>
+    </div>
+
+    <template x-if="!loading && tracks.length === 0">
+      <div class="empty-state panel">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg>
+        <p x-text="q ? 'No tracks match “' + q + '”.' : 'No tracks yet — add one, or import a CSV.'"></p>
+      </div>
+    </template>
+
+    <div>
+      <template x-for="t in tracks" :key="t.id">
+        <div class="track-row fade-in" :class="{ 'is-navidrome-only': t.navidrome_only }" :title="t.navidrome_only ? 'In Navidrome but not yet added to AccrediHub — edit it to add it properly' : ''">
+          <div class="art" :style="t.album_art_url ? 'background-image:url(' + t.album_art_url + ')' : ''">
+            <template x-if="!t.album_art_url"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="3"/></svg></template>
+          </div>
+          <div class="track-main">
+            <div class="track-title" x-text="t.title"></div>
+            <div class="track-meta" style="display:flex;align-items:center;gap:5px">
+              <a :href="'/artist.html?id=' + t.artist_id" x-text="t.artist_name"></a>
+              <template x-if="t.is_ai_artist">
+                <span title="AI Artist" style="display:inline-flex;color:#e0a721;flex-shrink:0">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="12" height="12"><path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0Z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+                </span>
+              </template>
+              <template x-if="t.album_name"><span> · <span x-text="t.album_name"></span></span></template>
+            </div>
+          </div>
+          <div class="theme-pills" x-show="t.themes && t.themes.length">
+            <template x-for="th in t.themes" :key="th.id">
+              <span class="pill pill-theme" x-text="th.name"></span>
+            </template>
+          </div>
+          <div class="track-col" x-text="SR.fmtDate(t.release_date) || '—'"></div>
+          <div class="track-actions">
+            <template x-if="t.navidrome_url">
+              <a :href="t.navidrome_url" target="_blank" class="icon-btn" title="Play in Navidrome" style="color:#22c55e" @click.stop>
+                <svg viewBox="0 0 24 24" fill="currentColor" stroke="none"><polygon points="6 3 20 12 6 21 6 3"/></svg>
+              </a>
+            </template>
+            <template x-if="!t.navidrome_url"><span class="icon-btn icon-btn-spacer" aria-hidden="true"></span></template>
+            <div class="icon-btn" :class="t.is_favourite && 'active'" @click="toggleFavourite(t)" title="Favourite">
+              <svg viewBox="0 0 24 24" :fill="t.is_favourite ? 'currentColor' : 'none'" stroke="currentColor" stroke-width="2"><path d="M20.8 4.6a5.5 5.5 0 0 0-7.8 0L12 5.6l-1-1a5.5 5.5 0 0 0-7.8 7.8l1 1L12 21l7.8-7.6 1-1a5.5 5.5 0 0 0 0-7.8z"/></svg>
+            </div>
+            <div class="icon-btn" @click="openEdit(t)" title="Edit">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg>
+            </div>
+            <div class="icon-btn" @click="remove(t)" title="Delete">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/></svg>
+            </div>
+          </div>
+        </div>
+      </template>
+    </div>
+
+    <template x-if="nextCursor">
+      <div style="text-align:center;margin-top:18px">
+        <button class="btn btn-ghost" @click="loadMore()" :disabled="loadingMore" x-text="loadingMore ? 'Loading…' : 'Load more'"></button>
+      </div>
+    </template>
+
+    <!-- Add / edit track modal -->
+    <div class="modal-backdrop" x-show="formOpen" x-cloak @click.self="formOpen = false">
+      <div class="modal">
+        <div class="modal-title" x-text="editingId ? 'Edit Track' : 'Add Track'"></div>
+        <form @submit.prevent="saveTrack()">
+          <label class="field-label">Track title</label>
+          <input class="input" style="margin-bottom:14px" x-model="form.title" required placeholder="Track title">
+
+          <label class="field-label">Artist</label>
+          <input class="input" style="margin-bottom:14px" x-model="form.artist_name" required placeholder="Artist name" list="artist-suggestions">
+          <datalist id="artist-suggestions">
+            <template x-for="a in allArtists" :key="a.id"><option :value="a.name"></option></template>
+          </datalist>
+
+          <label class="field-label">Album (optional)</label>
+          <input class="input" style="margin-bottom:14px" x-model="form.album_name" placeholder="Album name">
+
+          <label class="field-label">Release date (optional)</label>
+          <input class="input" style="margin-bottom:14px" type="date" x-model="form.release_date">
+
+          <label class="field-label">Album art</label>
+          <div style="display:flex;gap:10px;align-items:center;margin-bottom:16px">
+            <div class="art" :style="form.album_art_url ? 'background-image:url(' + form.album_art_url + ')' : ''" style="width:44px;height:44px"></div>
+            <input class="input" x-model="form.album_art_url" placeholder="Image URL, or upload →" style="flex:1">
+            <input type="file" accept="image/*" x-ref="artFile" @change="uploadArt($event, 'album')" style="display:none">
+            <button type="button" class="btn btn-ghost btn-sm" @click="$refs.artFile.click()" :disabled="uploading" x-text="uploading ? '…' : 'Upload'"></button>
+          </div>
+
+          <label class="field-label">Themes (what the song is about)</label>
+          <div class="chip-input-row" style="margin-bottom:16px">
+            <template x-for="name in form.themes" :key="name">
+              <span class="pill pill-theme pill-removable" @click="removeTheme(name)" title="Remove theme">
+                <span x-text="name"></span>
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+              </span>
+            </template>
+            <input placeholder="Add a theme, press Enter…" x-model="themeInput" list="theme-suggestions"
+                   @keydown.enter.prevent="addTheme()" @blur="addTheme()">
+          </div>
+          <datalist id="theme-suggestions">
+            <template x-for="th in allThemes" :key="th.id"><option :value="th.name"></option></template>
+          </datalist>
+
+          <div style="display:flex;justify-content:flex-end;gap:10px;margin-top:10px">
+            <button type="button" class="btn btn-ghost" @click="formOpen = false">Cancel</button>
+            <button type="submit" class="btn btn-primary" :disabled="saving" x-text="saving ? 'Saving…' : 'Save'"></button>
+          </div>
+        </form>
+      </div>
+    </div>
+
+  </main>
+</div>
+
+<script>
+function songsPage() {
+  return {
+    tracks: [], q: '', navidromeOnly: false, nextCursor: null, loading: true, loadingMore: false, total: 0,
+    favouriteIds: new Set(),
+    allArtists: [],
+    allThemes: [], selectedThemeFilters: [], themeFilterInput: '', themeInput: '',
+    formOpen: false, saving: false, uploading: false, editingId: null,
+    form: { title: '', artist_name: '', album_name: '', release_date: '', album_art_url: '', themes: [] },
+
+    async init() {
+      const user = await SR.requireAuth();
+      if (!user) return;
+      SR.mountSidebar('songs', user);
+      await this.loadFavourites();
+      await this.loadArtists();
+      await this.loadThemes();
+      await this.load();
+    },
+    async loadFavourites() {
+      try {
+        const r = await SR.api('/favourites');
+        this.favouriteIds = new Set((r.favourites || []).map(f => f.track_id));
+      } catch (e) {}
+    },
+    async loadArtists() {
+      try { const r = await SR.api('/artists'); this.allArtists = r.artists || []; } catch (e) {}
+    },
+    async loadThemes() {
+      try { const r = await SR.api('/themes'); this.allThemes = r.themes || []; } catch (e) {}
+    },
+    queryString() {
+      let qs = '';
+      if (this.q) qs += '&q=' + encodeURIComponent(this.q);
+      if (this.selectedThemeFilters.length) qs += '&theme_ids=' + this.selectedThemeFilters.map(t => t.id).join(',');
+      if (this.navidromeOnly) qs += '&navidrome_only=1';
+      return qs;
+    },
+    async load() {
+      this.loading = true;
+      try {
+        const r = await SR.api('/tracks?limit=50' + this.queryString());
+        this.tracks = (r.tracks || []).map(t => ({ ...t, is_favourite: this.favouriteIds.has(t.id) }));
+        this.nextCursor = r.nextCursor;
+        this.total = this.tracks.length;
+      } catch (e) { SR.toast(e.message); }
+      this.loading = false;
+    },
+    onSearch: SR.debounce(function () { this.load(); }, 300),
+    commitThemeFilter() {
+      const raw = (this.themeFilterInput || '').trim();
+      this.themeFilterInput = '';
+      if (!raw) return;
+      const match = this.allThemes.find(t => t.name.toLowerCase() === raw.toLowerCase());
+      if (!match || this.selectedThemeFilters.some(t => t.id === match.id)) return;
+      this.selectedThemeFilters.push(match);
+      this.load();
+    },
+    removeThemeFilter(th) {
+      this.selectedThemeFilters = this.selectedThemeFilters.filter(t => t.id !== th.id);
+      this.load();
+    },
+    async loadMore() {
+      if (!this.nextCursor) return;
+      this.loadingMore = true;
+      try {
+        const r = await SR.api('/tracks?limit=50&cursor=' + this.nextCursor + this.queryString());
+        const more = (r.tracks || []).map(t => ({ ...t, is_favourite: this.favouriteIds.has(t.id) }));
+        this.tracks = this.tracks.concat(more);
+        this.nextCursor = r.nextCursor;
+        this.total = this.tracks.length;
+      } catch (e) { SR.toast(e.message); }
+      this.loadingMore = false;
+    },
+    async toggleFavourite(t) {
+      t.is_favourite = !t.is_favourite;
+      try {
+        await SR.api('/favourites', { method: t.is_favourite ? 'POST' : 'DELETE', body: { track_id: t.id } });
+      } catch (e) { t.is_favourite = !t.is_favourite; SR.toast(e.message); }
+    },
+    openAdd() {
+      this.editingId = null;
+      this.themeInput = '';
+      this.form = { title: '', artist_name: '', album_name: '', release_date: '', album_art_url: '', themes: [] };
+      this.formOpen = true;
+    },
+    openEdit(t) {
+      this.editingId = t.id;
+      this.themeInput = '';
+      this.form = {
+        title: t.title, artist_name: t.artist_name, album_name: t.album_name || '',
+        release_date: t.release_date || '', album_art_url: t.album_art_url || '',
+        themes: (t.themes || []).map(th => th.name),
+      };
+      this.formOpen = true;
+    },
+    addTheme() {
+      const raw = (this.themeInput || '').replace(/\s+/g, ' ').trim();
+      this.themeInput = '';
+      if (!raw) return;
+      if (this.form.themes.some(n => n.toLowerCase() === raw.toLowerCase())) return;
+      this.form.themes.push(raw);
+    },
+    removeTheme(name) {
+      this.form.themes = this.form.themes.filter(n => n !== name);
+    },
+    async uploadArt(e, kind) {
+      const file = e.target.files[0];
+      if (!file) return;
+      this.uploading = true;
+      try {
+        const fd = new FormData();
+        fd.append('file', file);
+        fd.append('kind', kind);
+        const r = await SR.api('/uploads', { method: 'POST', body: fd });
+        this.form.album_art_url = r.url;
+      } catch (err) { SR.toast(err.message); }
+      this.uploading = false;
+    },
+    async saveTrack() {
+      this.addTheme(); // commit any theme text still sitting in the input
+      this.saving = true;
+      try {
+        if (this.editingId) {
+          await SR.api('/tracks/' + this.editingId, { method: 'PUT', body: this.form });
+        } else {
+          await SR.api('/tracks', { method: 'POST', body: this.form });
+        }
+        this.formOpen = false;
+        await this.loadArtists();
+        await this.loadThemes();
+        await this.load();
+        SR.toast('Saved.');
+      } catch (e) { SR.toast(e.message); }
+      this.saving = false;
+    },
+    async remove(t) {
+      if (!confirm('Delete “' + t.title + '”?')) return;
+      try {
+        await SR.api('/tracks/' + t.id, { method: 'DELETE' });
+        this.tracks = this.tracks.filter(x => x.id !== t.id);
+        this.total = this.tracks.length;
+      } catch (e) { SR.toast(e.message); }
+    },
+  };
+}
+</script>
+</body>
+</html>

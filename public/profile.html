@@ -1,0 +1,478 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Profile — AccrediHub</title>
+<link rel="stylesheet" href="/theme.css">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Sora:wght@600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<script src="https://cdn.tailwindcss.com"></script>
+<script src="/app.js"></script>
+<script src="https://unpkg.com/alpinejs@3.x.x/dist/cdn.min.js" defer></script>
+</head>
+<body>
+<div class="app-shell">
+  <nav class="sidebar" id="sidebar"></nav>
+
+  <main class="main" x-data="profilePage()" x-init="init()" x-cloak style="max-width:900px">
+    <div class="page-head">
+      <div>
+        <div class="page-title">Profile</div>
+        <div class="page-sub">Your account, library tools and security.</div>
+      </div>
+    </div>
+
+    <template x-if="loading"><div class="page-sub">Loading…</div></template>
+
+    <template x-if="!loading">
+      <div>
+        <!-- Details -->
+        <div class="panel section">
+          <div style="display:flex;gap:22px;align-items:center;flex-wrap:wrap;margin-bottom:22px">
+            <div class="avatar-lg" :style="form.avatar_url ? 'background-image:url(' + form.avatar_url + ')' : ''">
+              <span x-show="!form.avatar_url" x-text="SR.initials(form.display_name || username)"></span>
+            </div>
+            <div>
+              <div style="font-family:var(--display);font-size:22px;font-weight:700" x-text="form.display_name || username"></div>
+              <div class="page-sub" x-text="'Signed in as ' + username"></div>
+              <div style="display:flex;gap:8px;margin-top:10px">
+                <input type="file" accept="image/*" x-ref="avatarFile" @change="uploadAvatar($event)" style="display:none">
+                <button class="btn btn-ghost btn-sm" @click="$refs.avatarFile.click()" :disabled="uploading" x-text="uploading ? 'Uploading…' : 'Change photo'"></button>
+                <button class="btn btn-ghost btn-sm" x-show="form.avatar_url" @click="form.avatar_url = ''">Remove</button>
+              </div>
+            </div>
+          </div>
+
+          <form @submit.prevent="saveProfile()">
+            <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:14px">
+              <div>
+                <label class="field-label">Display name</label>
+                <input class="input" x-model="form.display_name" maxlength="80" :placeholder="username">
+              </div>
+              <div>
+                <label class="field-label">Email</label>
+                <input class="input" type="email" x-model="form.email" maxlength="200" placeholder="you@example.com">
+              </div>
+              <div>
+                <label class="field-label">Username</label>
+                <input class="input" :value="username" disabled title="Set by ADMIN_USERNAME in your stack">
+              </div>
+              <div>
+                <label class="field-label">Playlist Builder: hide tracks played within (weeks)</label>
+                <input class="input" type="number" min="0" max="520" x-model="form.default_weeks" placeholder="0 = don’t hide">
+              </div>
+            </div>
+            <div style="display:flex;justify-content:flex-end;margin-top:16px">
+              <button class="btn btn-primary" type="submit" :disabled="savingProfile" x-text="savingProfile ? 'Saving…' : 'Save changes'"></button>
+            </div>
+          </form>
+        </div>
+
+        <!-- Library overview -->
+        <div class="section">
+          <div class="section-head"><div class="section-title">Your library</div></div>
+          <div class="profile-grid">
+            <template x-for="s in statTiles" :key="s.label">
+              <div class="stat-tile"><div class="n" x-text="s.value"></div><div class="l" x-text="s.label"></div></div>
+            </template>
+          </div>
+        </div>
+
+        <!-- Library tools -->
+        <div class="panel section">
+          <div class="section-title" style="margin-bottom:16px">Library tools</div>
+
+          <div class="tool-row">
+            <div class="tool-desc">
+              <div class="tool-name">Import CSV</div>
+              <div class="tool-note">Columns: <code style="font-family:var(--mono)">title, artist_name, album_name, album_art_url, release_date</code>. First row is a header. Songs already in your library (artist + title) are skipped.</div>
+              <template x-if="importing"><div class="tool-note" style="color:var(--text)" x-text="importProgress"></div></template>
+              <template x-if="importResult && !importing">
+                <div class="tool-note" style="color:var(--text)">
+                  Created <strong x-text="importResult.created"></strong> ·
+                  duplicates skipped <strong x-text="importResult.duplicates || 0"></strong> ·
+                  other skipped <strong x-text="importResult.skipped"></strong>
+                  <span x-show="importResult.errors.length" x-text="' — ' + importResult.errors.slice(0,3).map(e => e.error).join('; ')"></span>
+                </div>
+              </template>
+            </div>
+            <div>
+              <input type="file" accept=".csv,text/csv" x-ref="csvFile" @change="handleCsv($event)" style="display:none">
+              <button class="btn btn-ghost" @click="$refs.csvFile.click()" :disabled="importing">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+                <span x-text="importing ? 'Importing…' : 'Choose CSV…'"></span>
+              </button>
+            </div>
+          </div>
+
+          <div class="tool-row">
+            <div class="tool-desc">
+              <div class="tool-name">Bulk upload</div>
+              <div class="tool-note">Restore or migrate your whole library in one go. Accepts a AccrediHub <code style="font-family:var(--mono)">.json</code> bundle (artists, tracks with themes, tour dates, PR agencies and contacts) or a <code style="font-family:var(--mono)">.csv</code> of any one kind &mdash; the type is detected from the header row. Existing records are matched and skipped, so re-running is safe.</div>
+              <template x-if="bulk.running"><div class="tool-note" style="color:var(--text)" x-text="bulk.progress"></div></template>
+              <template x-if="bulk.results.length && !bulk.running">
+                <div class="tool-note" style="color:var(--text)">
+                  <template x-for="r in bulk.results" :key="r.section">
+                    <div><strong x-text="r.label"></strong>: <span x-text="r.created"></span> added &middot; <span x-text="r.duplicates"></span> already existed<span x-show="r.skipped"> &middot; <span x-text="r.skipped"></span> skipped</span><span x-show="r.errors.length" x-text="' — ' + r.errors.slice(0,2).map(e => e.error).join('; ')"></span></div>
+                  </template>
+                </div>
+              </template>
+            </div>
+            <div style="display:flex;gap:8px;flex-wrap:wrap">
+              <input type="file" accept=".json,.csv,application/json,text/csv" multiple x-ref="bulkFile" @change="handleBulk($event)" style="display:none">
+              <button class="btn btn-ghost" @click="$refs.bulkFile.click()" :disabled="bulk.running" x-text="bulk.running ? 'Uploading…' : 'Choose files…'"></button>
+              <button class="btn btn-ghost" @click="exportBundle()" :disabled="bulk.exporting" x-text="bulk.exporting ? 'Preparing…' : 'Download bundle'"></button>
+            </div>
+          </div>
+
+          <div class="tool-row">
+            <div class="tool-desc">
+              <div class="tool-name">Export CSV</div>
+              <div class="tool-note">Download every track as a CSV — a handy backup, and it re-imports cleanly.</div>
+            </div>
+            <button class="btn btn-ghost" @click="exportCsv()" :disabled="exporting" x-text="exporting ? 'Preparing…' : 'Download CSV'"></button>
+          </div>
+
+          <div class="tool-row">
+            <div class="tool-desc">
+              <div class="tool-name">Sync Navidrome</div>
+              <div class="tool-note" x-text="navidromeStatus"></div>
+            </div>
+            <button class="btn btn-ghost" @click="syncNavidrome()" :disabled="syncingNavidrome">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>
+              <span x-text="syncingNavidrome ? 'Syncing…' : 'Sync Navidrome'"></span>
+            </button>
+          </div>
+
+          <div class="tool-row">
+            <div class="tool-desc">
+              <div class="tool-name">Backfill Art</div>
+              <div class="tool-note">Pull missing album art from Navidrome for matched tracks.</div>
+            </div>
+            <button class="btn btn-ghost" @click="backfillArtwork()" :disabled="backfillingArt">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="m21 15-5-5L5 21"/></svg>
+              <span x-text="backfillingArt ? 'Fetching art…' : 'Backfill Art'"></span>
+            </button>
+          </div>
+        </div>
+
+        <!-- Integrations -->
+        <div class="panel section">
+          <div class="section-title" style="margin-bottom:6px">Connected services</div>
+          <div class="tool-note" style="margin-bottom:12px">Configured with environment variables in your stack. Change them there and redeploy.</div>
+          <template x-for="i in integrationRows" :key="i.name">
+            <div class="tool-row" style="padding:10px 0">
+              <div class="tool-name" x-text="i.name"></div>
+              <span class="pill" :class="i.on ? 'pill-success' : ''" x-text="i.on ? 'Connected' : 'Not set up'"></span>
+            </div>
+          </template>
+        </div>
+
+        <!-- Security -->
+        <div class="panel section">
+          <div class="section-title" style="margin-bottom:16px">Security</div>
+          <form @submit.prevent="changePassword()">
+            <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:14px">
+              <div><label class="field-label">Current password</label><input class="input" type="password" autocomplete="current-password" x-model="pw.current" required></div>
+              <div><label class="field-label">New password (8+ characters)</label><input class="input" type="password" autocomplete="new-password" minlength="8" x-model="pw.next" required></div>
+              <div><label class="field-label">Confirm new password</label><input class="input" type="password" autocomplete="new-password" minlength="8" x-model="pw.confirm" required></div>
+            </div>
+            <div class="tool-note" style="margin-top:10px">Changing your password signs you out on every other device. A password set here overrides <code style="font-family:var(--mono)">ADMIN_PASSWORD</code> in your stack.</div>
+            <div style="display:flex;justify-content:flex-end;margin-top:14px">
+              <button class="btn btn-primary" type="submit" :disabled="savingPw" x-text="savingPw ? 'Updating…' : 'Update password'"></button>
+            </div>
+          </form>
+          <div class="tool-row" style="margin-top:18px">
+            <div class="tool-desc">
+              <div class="tool-name">Sign out everywhere</div>
+              <div class="tool-note">Ends every signed-in session, including this one.</div>
+            </div>
+            <button class="btn btn-danger" @click="signOutEverywhere()">Sign out everywhere</button>
+          </div>
+          <div class="tool-row">
+            <div class="tool-desc"><div class="tool-name">Sign out</div><div class="tool-note">Sign out of this browser only.</div></div>
+            <button class="btn btn-ghost" @click="signOut()">Sign out</button>
+          </div>
+        </div>
+      </div>
+    </template>
+  </main>
+</div>
+
+<script>
+function profilePage() {
+  return {
+    loading: true, username: '', stats: {}, integrations: {},
+    form: { display_name: '', email: '', avatar_url: '', default_weeks: '' },
+    savingProfile: false, uploading: false,
+    pw: { current: '', next: '', confirm: '' }, savingPw: false,
+    bulk: { running: false, exporting: false, progress: '', results: [] },
+    importing: false, importProgress: '', importResult: null, exporting: false,
+    syncingNavidrome: false, navidromeStatus: 'Check your tracks against your Navidrome library.', backfillingArt: false,
+
+    async init() {
+      const user = await SR.requireAuth();
+      if (!user) return;
+      this.username = user.username || user.email || 'admin';
+      SR.mountSidebar('profile', user);
+      await this.load();
+      this.loadNavidromeStatus();
+    },
+    applyProfile(r) {
+      const p = r.profile || {};
+      this.form = { display_name: p.display_name || '', email: p.email || '', avatar_url: p.avatar_url || '', default_weeks: p.default_weeks || '' };
+      this.stats = r.stats || {};
+      this.integrations = r.integrations || {};
+    },
+    async load() {
+      try { this.applyProfile(await SR.api('/profile')); } catch (e) { SR.toast(e.message); }
+      this.loading = false;
+    },
+    get statTiles() {
+      const s = this.stats;
+      return [
+        { label: 'Tracks', value: s.tracks }, { label: 'Artists', value: s.artists },
+        { label: 'Themes', value: s.themes }, { label: 'Playlists', value: s.playlists },
+        { label: 'Tour dates', value: s.tour_dates }, { label: 'On Navidrome', value: s.on_navidrome },
+      ];
+    },
+    get integrationRows() {
+      return [
+        { name: 'Navidrome', on: this.integrations.navidrome },
+        { name: 'Bandsintown', on: this.integrations.bandsintown },
+        { name: 'Ticketmaster', on: this.integrations.ticketmaster },
+      ];
+    },
+    async uploadAvatar(e) {
+      const file = e.target.files[0];
+      if (!file) return;
+      this.uploading = true;
+      try {
+        const fd = new FormData();
+        fd.append('file', file);
+        fd.append('kind', 'avatar');
+        const r = await SR.api('/uploads', { method: 'POST', body: fd });
+        this.form.avatar_url = r.url;
+      } catch (err) { SR.toast(err.message); }
+      this.uploading = false;
+      e.target.value = '';
+    },
+    async saveProfile() {
+      this.savingProfile = true;
+      try {
+        this.applyProfile(await SR.api('/profile', { method: 'PUT', body: this.form }));
+        await SR.mountSidebar('profile');
+        SR.toast('Profile saved.');
+      } catch (e) { SR.toast(e.message); }
+      this.savingProfile = false;
+    },
+    async changePassword() {
+      if (this.pw.next !== this.pw.confirm) { SR.toast('The new passwords don’t match.'); return; }
+      this.savingPw = true;
+      try {
+        await SR.api('/auth/password', { method: 'POST', body: { current_password: this.pw.current, new_password: this.pw.next } });
+        this.pw = { current: '', next: '', confirm: '' };
+        SR.toast('Password updated. Other devices have been signed out.');
+      } catch (e) { SR.toast(e.message); }
+      this.savingPw = false;
+    },
+    async signOut() {
+      try { await fetch('/api/auth/logout', { method: 'POST', credentials: 'same-origin' }); } catch (e) {}
+      location.href = '/login.html';
+    },
+    async signOutEverywhere() {
+      if (!confirm('Sign out of every device, including this one?')) return;
+      try { await SR.api('/auth/signout-everywhere', { method: 'POST' }); } catch (e) {}
+      location.href = '/login.html';
+    },
+
+    // ---- Bulk upload (JSON bundle or single-type CSV)
+    BULK_LABELS: { artists: 'Artists', tracks: 'Tracks', tour_dates: 'Tour dates', pr_agencies: 'PR agencies', artist_pr: 'Artist ↔ PR links' },
+    detectSection(headers) {
+      const h = new Set(headers);
+      if (h.has('event_date')) return 'tour_dates';
+      if (h.has('title')) return 'tracks';
+      if (h.has('company')) return 'pr_agencies';
+      if ((h.has('agency')) && (h.has('artist_name') || h.has('artist'))) return 'artist_pr';
+      if (h.has('name') || h.has('artist_name')) return 'artists';
+      return null;
+    },
+    async handleBulk(e) {
+      const files = Array.from(e.target.files || []);
+      e.target.value = '';
+      if (!files.length) return;
+      const jobs = [];
+      for (const f of files) {
+        const text = await f.text();
+        if (/\.json$/i.test(f.name) || /^\s*[\[{]/.test(text)) {
+          let data;
+          try { data = JSON.parse(text); } catch (err) { SR.toast(f.name + ' is not valid JSON.'); return; }
+          for (const k of Object.keys(this.BULK_LABELS)) if (Array.isArray(data[k]) && data[k].length) jobs.push({ section: k, rows: data[k] });
+        } else {
+          const table = this.parseCsv(text);
+          const headers = (table[0] || []).map(x => x.trim().toLowerCase());
+          const section = this.detectSection(headers);
+          if (!section) { SR.toast('Can’t tell what ' + f.name + ' contains — check its header row.'); return; }
+          const rows = table.slice(1).map(cells => { const o = {}; headers.forEach((k, i) => { o[k] = (cells[i] || '').trim(); }); return o; });
+          jobs.push({ section, rows });
+        }
+      }
+      if (!jobs.length) { SR.toast('Nothing to upload in those files.'); return; }
+      // Dependencies first: agencies before links, artists before tracks/dates.
+      const order = ['artists', 'pr_agencies', 'tracks', 'tour_dates', 'artist_pr'];
+      jobs.sort((a, b) => order.indexOf(a.section) - order.indexOf(b.section));
+      this.bulk.running = true; this.bulk.results = [];
+      const BATCH = 300;
+      for (const job of jobs) {
+        const res = { section: job.section, label: this.BULK_LABELS[job.section], created: 0, duplicates: 0, skipped: 0, errors: [] };
+        for (let i = 0; i < job.rows.length; i += BATCH) {
+          this.bulk.progress = res.label + ': ' + Math.min(i + BATCH, job.rows.length) + ' / ' + job.rows.length + '…';
+          try {
+            const r = await SR.api('/bulk', { method: 'POST', body: { section: job.section, rows: job.rows.slice(i, i + BATCH) } });
+            res.created += r.created; res.duplicates += r.duplicates || 0; res.skipped += r.skipped || 0;
+            res.errors = res.errors.concat(r.errors || []);
+          } catch (err) {
+            res.skipped += Math.min(BATCH, job.rows.length - i);
+            res.errors.push({ error: err.message });
+          }
+        }
+        this.bulk.results.push(res);
+      }
+      this.bulk.running = false; this.bulk.progress = '';
+      await this.load();
+    },
+    async exportBundle() {
+      this.bulk.exporting = true;
+      try {
+        const data = await SR.api('/bulk');
+        const blob = new Blob([JSON.stringify(data)], { type: 'application/json' });
+        const a = document.createElement('a');
+        a.href = URL.createObjectURL(blob);
+        a.download = 'accredihub-bundle-' + new Date().toISOString().slice(0, 10) + '.json';
+        document.body.appendChild(a); a.click(); a.remove();
+        SR.toast('Exported ' + data.tracks.length + ' tracks, ' + data.artists.length + ' artists.');
+      } catch (err) { SR.toast(err.message); }
+      this.bulk.exporting = false;
+    },
+
+    // ---- CSV import / export
+    parseCsv(text) {
+      const rows = [];
+      let row = [], field = '', inQuotes = false;
+      for (let i = 0; i < text.length; i++) {
+        const c = text[i];
+        if (inQuotes) {
+          if (c === '"') { if (text[i + 1] === '"') { field += '"'; i++; } else inQuotes = false; }
+          else field += c;
+        } else if (c === '"') inQuotes = true;
+        else if (c === ',') { row.push(field); field = ''; }
+        else if (c === '\r') { /* ignore */ }
+        else if (c === '\n') { row.push(field); rows.push(row); row = []; field = ''; }
+        else field += c;
+      }
+      if (field.length || row.length) { row.push(field); rows.push(row); }
+      return rows.filter(r => r.some(c => c.trim().length));
+    },
+    handleCsv(e) {
+      const file = e.target.files[0];
+      if (!file) return;
+      const reader = new FileReader();
+      reader.onload = async (ev) => {
+        const table = this.parseCsv(ev.target.result);
+        if (!table.length) { SR.toast('That file has no rows.'); return; }
+        const headers = table[0].map(h => h.trim().toLowerCase());
+        const allRows = table.slice(1).map(cells => {
+          const obj = {};
+          headers.forEach((h, i) => { obj[h] = (cells[i] || '').trim(); });
+          return obj;
+        });
+        const BATCH = 200;
+        this.importing = true;
+        this.importResult = { created: 0, duplicates: 0, skipped: 0, errors: [] };
+        for (let i = 0; i < allRows.length; i += BATCH) {
+          const batch = allRows.slice(i, i + BATCH);
+          this.importProgress = 'Importing ' + Math.min(i + BATCH, allRows.length) + ' / ' + allRows.length + '…';
+          try {
+            const r = await SR.api('/tracks/import', { method: 'POST', body: { rows: batch } });
+            this.importResult.created += r.created;
+            this.importResult.duplicates += r.duplicates || 0;
+            this.importResult.skipped += r.skipped;
+            this.importResult.errors = this.importResult.errors.concat(r.errors || []);
+          } catch (err) {
+            this.importResult.skipped += batch.length;
+            this.importResult.errors.push({ error: err.message });
+          }
+        }
+        this.importing = false;
+        this.importProgress = '';
+        e.target.value = '';
+        await this.load();
+      };
+      reader.readAsText(file);
+    },
+    async exportCsv() {
+      this.exporting = true;
+      try {
+        let all = [], cursor = null;
+        do {
+          const r = await SR.api('/tracks?limit=200' + (cursor ? '&cursor=' + cursor : ''));
+          all = all.concat(r.tracks || []);
+          cursor = r.nextCursor;
+        } while (cursor);
+        const esc = (v) => { v = v == null ? '' : String(v); return /[",\n\r]/.test(v) ? '"' + v.replace(/"/g, '""') + '"' : v; };
+        const lines = ['title,artist_name,album_name,album_art_url,release_date'].concat(
+          all.map(t => [t.title, t.artist_name, t.album_name, t.album_art_url && !t.album_art_url.startsWith('data:') ? t.album_art_url : '', t.release_date].map(esc).join(',')));
+        const blob = new Blob([lines.join('\n') + '\n'], { type: 'text/csv' });
+        const a = document.createElement('a');
+        a.href = URL.createObjectURL(blob);
+        a.download = 'accredihub-export-' + new Date().toISOString().slice(0, 10) + '.csv';
+        document.body.appendChild(a); a.click(); a.remove();
+        SR.toast('Exported ' + all.length + ' tracks.');
+      } catch (e) { SR.toast(e.message); }
+      this.exporting = false;
+    },
+
+    // ---- Navidrome
+    async loadNavidromeStatus() {
+      try {
+        const r = await SR.api('/navidrome/sync');
+        if (r.phase === 'walking') this.navidromeStatus = `Scanning your library… ${r.artist_cursor}/${r.artists_total} artists so far`;
+        else if (r.phase === 'matching') this.navidromeStatus = 'Matching your library against Navidrome…';
+        else if (r.last_result) this.navidromeStatus = `Last synced: matched ${r.last_result.matched} of ${r.last_result.tracksChecked} tracks against ${r.last_result.librarySongs} Navidrome songs.`;
+      } catch (e) { /* leave the default */ }
+    },
+    async syncNavidrome() {
+      this.syncingNavidrome = true;
+      try {
+        const r = await SR.api('/navidrome/sync', { method: 'POST' });
+        if (r.skipped) {
+          this.navidromeStatus = 'Navidrome isn’t configured yet — set the NAVIDROME_* variables in your stack.';
+          SR.toast('Navidrome isn’t configured — set the NAVIDROME_* variables in your stack.');
+        } else if (r.phase === 'walking') {
+          this.navidromeStatus = `Scanning your library… ${r.artistsProcessed}/${r.artistsTotal} artists so far`;
+          SR.toast(`Scanning Navidrome… ${r.artistsProcessed} of ${r.artistsTotal} artists checked so far. This continues in the background.`);
+        } else if (r.phase === 'matching') {
+          this.navidromeStatus = 'Whole library scanned — matching against your tracks now…';
+          SR.toast('Finished scanning your Navidrome library — matching it against your tracks now.');
+        } else {
+          SR.toast('Sync already up to date.');
+          await this.loadNavidromeStatus();
+        }
+      } catch (e) { SR.toast(e.message); }
+      this.syncingNavidrome = false;
+    },
+    async backfillArtwork() {
+      this.backfillingArt = true;
+      try {
+        const r = await SR.api('/navidrome/backfill-artwork', { method: 'POST' });
+        if (r.skipped) SR.toast('Navidrome isn’t configured — set the NAVIDROME_* variables in your stack.');
+        else SR.toast(`Fetched art for ${r.applied} album${r.applied === 1 ? '' : 's'}.` + (r.more ? ' More will continue in the background.' : ''));
+      } catch (e) { SR.toast(e.message); }
+      this.backfillingArt = false;
+    },
+  };
+}
+</script>
+</body>
+</html>

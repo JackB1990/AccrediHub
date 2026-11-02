@@ -1,0 +1,359 @@
+{
+ "accredihub_bundle": 1,
+ "artists": [
+  {
+   "name": "Neva Vira",
+   "location": null,
+   "year_formed": null
+  },
+  {
+   "name": "We Came As Romans",
+   "location": "Troy, Michigan, USA",
+   "year_formed": 2005
+  },
+  {
+   "name": "Midnight Swim",
+   "location": "Manchester, England",
+   "year_formed": 2023
+  },
+  {
+   "name": "Asking Alexandria",
+   "location": "York, England",
+   "year_formed": 2008
+  },
+  {
+   "name": "The Amity Affliction",
+   "location": "Gympie, Queensland, Australia",
+   "year_formed": 2003
+  },
+  {
+   "name": "Ed Sheeran",
+   "location": "Halifax, West Yorkshire, England",
+   "year_formed": 2004
+  },
+  {
+   "name": "Evanescence",
+   "location": "Little Rock, Arkansas, USA",
+   "year_formed": 1994
+  },
+  {
+   "name": "Drowning Pool",
+   "location": "Dallas, Texas, USA",
+   "year_formed": 1996
+  },
+  {
+   "name": "DON BROCO",
+   "location": "Bedford, England",
+   "year_formed": 2008
+  },
+  {
+   "name": "Disturbed",
+   "location": "Chicago, Illinois, USA",
+   "year_formed": 1994
+  },
+  {
+   "name": "Arctic Monkeys",
+   "location": null,
+   "year_formed": null
+  },
+  {
+   "name": "Biffy Clyro",
+   "location": null,
+   "year_formed": null
+  },
+  {
+   "name": "Beartooth",
+   "location": null,
+   "year_formed": null
+  },
+  {
+   "name": "Bad Wolves",
+   "location": null,
+   "year_formed": null
+  },
+  {
+   "name": "Billy Idol",
+   "location": null,
+   "year_formed": null
+  },
+  {
+   "name": "Enter Shikari",
+   "location": null,
+   "year_formed": null
+  },
+  {
+   "name": "Dropkick Murphys",
+   "location": null,
+   "year_formed": null
+  },
+  {
+   "name": "The Ataris",
+   "location": null,
+   "year_formed": null
+  }
+ ],
+ "tracks": [
+  {
+   "artist_name": "We Came As Romans",
+   "title": "One More Day",
+   "album_name": "Darkbloom",
+   "release_date": "2022-10-14",
+   "track_number": null,
+   "disc_number": null,
+   "themes": [
+    "Cover"
+   ]
+  },
+  {
+   "artist_name": "Midnight Swim",
+   "title": "Tease",
+   "album_name": "Tease",
+   "release_date": "2026-09-01",
+   "track_number": null,
+   "disc_number": null,
+   "themes": []
+  },
+  {
+   "artist_name": "Asking Alexandria",
+   "title": "Down To Hell",
+   "album_name": "Like A House On Fire",
+   "release_date": "2020-05-15",
+   "track_number": null,
+   "disc_number": null,
+   "themes": []
+  },
+  {
+   "artist_name": "The Amity Affliction",
+   "title": "Soak Me in Bleach",
+   "album_name": "Everyone Loves You... Once You Leave Them",
+   "release_date": "2020-02-21",
+   "track_number": null,
+   "disc_number": null,
+   "themes": []
+  },
+  {
+   "artist_name": "The Amity Affliction",
+   "title": "All My Friends Are Dead",
+   "album_name": "Everyone Loves You... Once You Leave Them",
+   "release_date": "2020-02-21",
+   "track_number": null,
+   "disc_number": null,
+   "themes": []
+  },
+  {
+   "artist_name": "Ed Sheeran",
+   "title": "The A Team",
+   "album_name": "+",
+   "release_date": "2011-09-09",
+   "track_number": 1,
+   "disc_number": null,
+   "themes": []
+  },
+  {
+   "artist_name": "Ed Sheeran",
+   "title": "U.N.I.",
+   "album_name": "+",
+   "release_date": "2011-09-09",
+   "track_number": 3,
+   "disc_number": null,
+   "themes": []
+  },
+  {
+   "artist_name": "Evanescence",
+   "title": "Going Under",
+   "album_name": "Fallen",
+   "release_date": "2003-03-04",
+   "track_number": 1,
+   "disc_number": 1,
+   "themes": []
+  },
+  {
+   "artist_name": "Evanescence",
+   "title": "Bring Me To Life",
+   "album_name": "Fallen",
+   "release_date": "2003-03-04",
+   "track_number": 2,
+   "disc_number": 1,
+   "themes": []
+  },
+  {
+   "artist_name": "Evanescence",
+   "title": "My Immortal",
+   "album_name": "Fallen",
+   "release_date": "2003-03-04",
+   "track_number": 4,
+   "disc_number": 1,
+   "themes": []
+  },
+  {
+   "artist_name": "Drowning Pool",
+   "title": "Bodies",
+   "album_name": "Sinner",
+   "release_date": "2001-01-01",
+   "track_number": null,
+   "disc_number": null,
+   "themes": []
+  },
+  {
+   "artist_name": "DON BROCO",
+   "title": "T-Shirt Song",
+   "album_name": "Technology",
+   "release_date": "2018-02-02",
+   "track_number": null,
+   "disc_number": null,
+   "themes": []
+  },
+  {
+   "artist_name": "Disturbed",
+   "title": "Ten Thousand Fists",
+   "album_name": "Ten Thousand Fists",
+   "release_date": "2005-09-19",
+   "track_number": null,
+   "disc_number": null,
+   "themes": []
+  },
+  {
+   "artist_name": "Disturbed",
+   "title": "Down with the Sickness",
+   "album_name": "The Sickness",
+   "release_date": "2000-03-07",
+   "track_number": 15,
+   "disc_number": null,
+   "themes": []
+  },
+  {
+   "artist_name": "Arctic Monkeys",
+   "title": "Brianstorm",
+   "album_name": "Favourite Worst Nightmare",
+   "release_date": "2007-04-22",
+   "track_number": null,
+   "disc_number": null,
+   "themes": []
+  },
+  {
+   "artist_name": "Biffy Clyro",
+   "title": "The Captain",
+   "album_name": "Only Revolutions",
+   "release_date": "2010-01-18",
+   "track_number": 1,
+   "disc_number": null,
+   "themes": []
+  },
+  {
+   "artist_name": "Biffy Clyro",
+   "title": "Mountains",
+   "album_name": "Only Revolutions",
+   "release_date": "2010-01-18",
+   "track_number": 6,
+   "disc_number": null,
+   "themes": []
+  },
+  {
+   "artist_name": "Beartooth",
+   "title": "Disease",
+   "album_name": "Disease",
+   "release_date": "2018-09-28",
+   "track_number": null,
+   "disc_number": null,
+   "themes": []
+  },
+  {
+   "artist_name": "Bad Wolves",
+   "title": "Zombie",
+   "album_name": "Disobey",
+   "release_date": "2018-05-11",
+   "track_number": 4,
+   "disc_number": 1,
+   "themes": []
+  },
+  {
+   "artist_name": "Bad Wolves",
+   "title": "Hear Me Now (feat. DIAMANTE)",
+   "album_name": "Disobey",
+   "release_date": "2018-05-11",
+   "track_number": 9,
+   "disc_number": 1,
+   "themes": []
+  },
+  {
+   "artist_name": "Billy Idol",
+   "title": "White Wedding - Pt. 1",
+   "album_name": "Billy Idol",
+   "release_date": "1982-01-01",
+   "track_number": null,
+   "disc_number": null,
+   "themes": []
+  },
+  {
+   "artist_name": "Enter Shikari",
+   "title": "Sorry You're Not a Winner",
+   "album_name": "Take to the Skies",
+   "release_date": "2007-03-18",
+   "track_number": null,
+   "disc_number": null,
+   "themes": []
+  },
+  {
+   "artist_name": "Dropkick Murphys",
+   "title": "The State Of Massachusetts",
+   "album_name": "The Meanest of Times Limited Edition",
+   "release_date": "2007-09-18",
+   "track_number": null,
+   "disc_number": null,
+   "themes": []
+  },
+  {
+   "artist_name": "The Ataris",
+   "title": "The Boys of Summer",
+   "album_name": "So Long, Astoria",
+   "release_date": "2003-03-04",
+   "track_number": 10,
+   "disc_number": null,
+   "themes": []
+  }
+ ],
+ "tour_dates": [],
+ "pr_agencies": [
+  {
+   "company": "Atom Splitter PR",
+   "contacts": []
+  },
+  {
+   "company": "Chuff Media",
+   "contacts": []
+  },
+  {
+   "company": "Cosa Nostra PR",
+   "contacts": []
+  },
+  {
+   "company": "Duff Press",
+   "contacts": []
+  },
+  {
+   "company": "Gardenia Publicity",
+   "contacts": []
+  },
+  {
+   "company": "Good As Gold Group",
+   "contacts": []
+  },
+  {
+   "company": "Hale Storm PR",
+   "contacts": []
+  },
+  {
+   "company": "The Noise Cartel",
+   "contacts": []
+  },
+  {
+   "company": "Turn The Page",
+   "contacts": []
+  },
+  {
+   "company": "Wilful and Sullivan Publicity",
+   "contacts": []
+  }
+ ],
+ "artist_pr": []
+}

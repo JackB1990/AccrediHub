@@ -1,0 +1,437 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Tour Dates — AccrediHub</title>
+<link rel="stylesheet" href="/theme.css">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Sora:wght@600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<script src="https://cdn.tailwindcss.com"></script>
+<script src="/app.js"></script>
+<script src="https://unpkg.com/alpinejs@3.x.x/dist/cdn.min.js" defer></script>
+</head>
+<body>
+<div class="app-shell">
+  <nav class="sidebar" id="sidebar"></nav>
+
+  <main class="main" x-data="calendarPage()" x-init="init()" x-cloak>
+    <div class="page-head">
+      <div>
+        <div class="page-title">Tour Dates</div>
+        <div class="page-sub" x-text="monthLabel"></div>
+      </div>
+      <div class="cal-nav" style="flex-wrap:wrap">
+        <div class="icon-btn" @click="prevMonth()" title="Previous month">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="15 18 9 12 15 6"/></svg>
+        </div>
+        <button class="btn btn-ghost btn-sm" @click="goToday()">Today</button>
+        <div class="icon-btn" @click="nextMonth()" title="Next month">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"/></svg>
+        </div>
+        <button class="btn btn-primary" @click="openAdd()" style="margin-left:8px">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+          Add Tour Date
+        </button>
+        <button class="btn btn-ghost" @click="findTourDates()" :disabled="discovering || !anySourceConfigured || onCooldown" :title="discoveryStatus">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+          <span x-text="discovering ? 'Scanning…' : 'Find new tour dates'"></span>
+        </button>
+      </div>
+    </div>
+
+    <div class="cal-grid" style="margin-bottom:6px">
+      <template x-for="dow in ['Sun','Mon','Tue','Wed','Thu','Fri','Sat']" :key="dow">
+        <div class="cal-dow" x-text="dow"></div>
+      </template>
+    </div>
+    <div class="cal-grid">
+      <template x-for="cell in cells" :key="cell.key">
+        <div class="cal-cell" :class="{'cal-outside': !cell.inMonth, 'cal-today': cell.isToday}">
+          <div class="cal-daynum" x-text="cell.day"></div>
+          <template x-for="ev in cell.events" :key="ev.id">
+            <div class="cal-event" :class="statusPillClass(ev.status)" @click="location.href = '/artist.html?id=' + ev.artist_id" :title="ev.artist_name + (ev.venue ? ' — ' + ev.venue : '')" x-text="ev.artist_name"></div>
+          </template>
+        </div>
+      </template>
+    </div>
+
+    <!-- Full list, grouped by month -->
+    <div style="display:flex;gap:14px;flex-wrap:wrap;align-items:center;justify-content:space-between;margin:38px 0 16px">
+      <div>
+        <div class="section-title" style="font-size:16px;font-weight:700">All Tour Dates</div>
+        <div class="page-sub" x-text="listLoading ? 'Loading…' : (allDates.length + ' date' + (allDates.length === 1 ? '' : 's'))"></div>
+      </div>
+      <div style="display:flex;gap:14px;flex-wrap:wrap;align-items:center">
+        <select class="input" style="max-width:200px" x-model="statusFilter" @change="loadList()">
+          <option value="">All statuses</option>
+          <option value="new">New</option>
+          <option value="applied">Applied</option>
+          <option value="awaiting">Awaiting</option>
+          <option value="approved">Approved</option>
+          <option value="denied">Denied</option>
+        </select>
+        <label style="display:flex;align-items:center;gap:8px;font-size:13.5px;color:var(--text-dim);cursor:pointer">
+          <input type="checkbox" x-model="includePast" @change="loadList()" style="width:16px;height:16px">
+          Include past dates
+        </label>
+      </div>
+    </div>
+
+    <template x-if="!listLoading && groupedMonths.length === 0">
+      <div class="empty-state panel"><p>No tour dates match.</p></div>
+    </template>
+
+    <template x-for="month in groupedMonths" :key="month.key">
+      <div class="panel month-group">
+        <div class="month-header" @click="toggleMonth(month.key)">
+          <div style="display:flex;align-items:center;gap:10px">
+            <div class="month-chevron" :class="{open: isExpanded(month.key)}">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 6 15 12 9 18"/></svg>
+            </div>
+            <div class="month-title" x-text="month.label"></div>
+          </div>
+          <div class="pill" x-text="month.dates.length + ' date' + (month.dates.length === 1 ? '' : 's')"></div>
+        </div>
+        <div class="month-body" x-show="isExpanded(month.key)" x-cloak>
+          <template x-for="td in month.dates" :key="td.id">
+            <div class="track-row">
+              <a :href="'/artist.html?id=' + td.artist_id" class="art" style="width:44px;height:44px;border-radius:50%" :style="td.artist_photo_url ? 'background-image:url(' + td.artist_photo_url + ');background-size:cover;background-position:center' : ''">
+                <template x-if="!td.artist_photo_url"><span x-text="SR.initials(td.artist_name)"></span></template>
+              </a>
+              <div class="track-main">
+                <div class="track-title"><a :href="'/artist.html?id=' + td.artist_id" x-text="td.artist_name"></a></div>
+                <div class="track-meta" x-text="(td.venue || 'Venue TBA') + (td.city ? ' — ' + td.city : '')"></div>
+              </div>
+              <div class="track-col" x-text="SR.fmtDate(td.event_date)"></div>
+              <select class="input" style="width:auto;max-width:130px;padding:6px 10px;font-size:12.5px;flex-shrink:0" :value="td.status" @change="quickStatus(td, $event.target.value)">
+                <option value="new">New</option>
+                <option value="applied">Applied</option>
+                <option value="awaiting">Awaiting</option>
+                <option value="approved">Approved</option>
+                <option value="denied">Denied</option>
+              </select>
+              <div class="track-actions">
+                <template x-if="td.ticket_url"><a :href="td.ticket_url" target="_blank" class="pill pill-accent">Tickets</a></template>
+                <div class="icon-btn" @click="openEdit(td)" title="Edit">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg>
+                </div>
+                <div class="icon-btn" @click="remove(td)" title="Remove">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+                </div>
+              </div>
+            </div>
+          </template>
+        </div>
+      </div>
+    </template>
+
+    <!-- Add/edit modal -->
+    <div class="modal-backdrop" x-show="formOpen" x-cloak @click.self="formOpen = false">
+      <div class="modal">
+        <div class="modal-title" x-text="editingId ? 'Edit Tour Date' : 'Add Tour Date'"></div>
+        <form @submit.prevent="save()">
+          <label class="field-label">Artist</label>
+          <input class="input" style="margin-bottom:14px" x-model="form.artist_name" required placeholder="Artist name" list="artist-suggestions">
+          <datalist id="artist-suggestions">
+            <template x-for="a in allArtists" :key="a.id"><option :value="a.name"></option></template>
+          </datalist>
+          <label class="field-label">Date</label>
+          <input class="input" style="margin-bottom:14px" type="date" x-model="form.event_date" required>
+          <label class="field-label">Venue</label>
+          <input class="input" style="margin-bottom:14px" x-model="form.venue" placeholder="Venue name">
+          <label class="field-label">City</label>
+          <input class="input" style="margin-bottom:14px" x-model="form.city" placeholder="City">
+          <label class="field-label">Ticket link (optional)</label>
+          <input class="input" style="margin-bottom:14px" x-model="form.ticket_url" placeholder="https://…">
+          <label class="field-label">Status</label>
+          <select class="input" style="margin-bottom:16px" x-model="form.status">
+            <option value="new">New</option>
+            <option value="applied">Applied</option>
+            <option value="awaiting">Awaiting</option>
+            <option value="approved">Approved</option>
+            <option value="denied">Denied</option>
+          </select>
+          <div style="display:flex;justify-content:flex-end;gap:10px">
+            <button type="button" class="btn btn-ghost" @click="formOpen = false">Cancel</button>
+            <button type="submit" class="btn btn-primary" :disabled="saving" x-text="saving ? 'Saving…' : 'Save'"></button>
+          </div>
+        </form>
+      </div>
+    </div>
+
+    <!-- Find new tour dates progress modal -->
+    <div class="modal-backdrop" x-show="discoveryModalOpen" x-cloak>
+      <div class="modal" style="max-width:420px">
+        <div class="modal-title">Find New Tour Dates</div>
+        <template x-if="discoveryPhase === 'scanning'">
+          <div>
+            <p class="page-sub" style="margin-bottom:16px">Searching <span x-text="activeSourcesLabel()"></span> for new tour dates…</p>
+            <div class="progress-track" style="margin-bottom:10px">
+              <div class="progress-fill" :style="'width:' + (discoveryProgress.total ? Math.round(discoveryProgress.processed / discoveryProgress.total * 100) : 0) + '%'"></div>
+            </div>
+            <p class="page-sub" x-text="discoveryProgress.total ? (discoveryProgress.processed + ' / ' + discoveryProgress.total + ' artists checked') : 'Starting…'"></p>
+          </div>
+        </template>
+        <template x-if="discoveryPhase === 'done'">
+          <div>
+            <p style="font-size:15px;color:var(--text);margin-bottom:22px" x-text="discoveryRunFound ? ('Found ' + discoveryRunFound + ' new tour date' + (discoveryRunFound === 1 ? '' : 's') + '.') : 'No new tour dates found.'"></p>
+            <div style="display:flex;justify-content:flex-end">
+              <button class="btn btn-primary" @click="closeDiscoveryModal()">Confirm</button>
+            </div>
+          </div>
+        </template>
+      </div>
+    </div>
+  </main>
+</div>
+
+<script>
+function calendarPage() {
+  return {
+    cursor: new Date(), events: [], allDates: [], allArtists: [],
+    loading: true, listLoading: true, saving: false,
+    statusFilter: '', includePast: false, expanded: {},
+    formOpen: false, editingId: null,
+    discovering: false, bandsintownConfigured: false, ticketmasterConfigured: false, discoveryStatus: 'Checking setup…',
+    discoveryModalOpen: false, discoveryPhase: 'scanning', discoveryProgress: { processed: 0, total: 0 },
+    discoveryRunFound: 0, discoveryPollTimer: null, cooldownUntil: null,
+    form: { artist_name: '', event_date: '', venue: '', city: '', ticket_url: '', status: 'new' },
+
+    async init() {
+      const user = await SR.requireAuth();
+      if (!user) return;
+      SR.mountSidebar('tourdates', user);
+      await this.loadArtists();
+      await Promise.all([this.load(), this.loadList()]);
+      await this.loadDiscoveryStatus();
+    },
+    get anySourceConfigured() { return this.bandsintownConfigured || this.ticketmasterConfigured; },
+    get onCooldown() { return !!this.cooldownUntil && new Date(this.cooldownUntil) > new Date(); },
+    activeSourcesLabel() {
+      const names = [];
+      if (this.bandsintownConfigured) names.push('Bandsintown');
+      if (this.ticketmasterConfigured) names.push('Ticketmaster');
+      return names.join(' and ');
+    },
+    applyConfigured(r) {
+      this.bandsintownConfigured = !!(r.bandsintown_configured ?? r.bandsintownConfigured);
+      this.ticketmasterConfigured = !!(r.ticketmaster_configured ?? r.ticketmasterConfigured);
+      this.cooldownUntil = r.cooldown_until ?? r.cooldownUntil ?? this.cooldownUntil;
+    },
+    cooldownMessage() {
+      const until = new Date(this.cooldownUntil);
+      return `Already searched recently — you can search again from ${until.toLocaleString()}.`;
+    },
+    async loadDiscoveryStatus() {
+      try {
+        const r = await SR.api('/tour-dates/discover');
+        this.applyConfigured(r);
+        if (!this.anySourceConfigured) {
+          this.discoveryStatus = 'Not configured yet — set BANDSINTOWN_APP_ID or TICKETMASTER_API_KEY in your stack to use this.';
+        } else if (r.phase === 'scanning') {
+          this.discoveryStatus = `Scan in progress… ${r.artist_cursor || 0}/${r.artists_total || 0} artists checked so far`;
+        } else if (this.onCooldown) {
+          this.discoveryStatus = this.cooldownMessage();
+        } else if (r.last_result) {
+          this.discoveryStatus = `Last scan (${this.activeSourcesLabel()}): found ${r.last_result.totalFound || 0} new date${r.last_result.totalFound === 1 ? '' : 's'} across ${r.last_result.artistsScanned || 0} artists.`;
+        } else {
+          this.discoveryStatus = `Search ${this.activeSourcesLabel()} for new tour dates`;
+        }
+      } catch (e) {
+        this.discoveryStatus = 'Search for new tour dates';
+      }
+    },
+    async findTourDates() {
+      if (!this.anySourceConfigured || this.discovering || this.onCooldown) return;
+      this.discovering = true;
+      this.discoveryRunFound = 0;
+      this.discoveryProgress = { processed: 0, total: 0 };
+      this.discoveryPhase = 'scanning';
+      this.discoveryModalOpen = true;
+      try {
+        const r = await SR.api('/tour-dates/discover', { method: 'POST' });
+        this.applyConfigured(r);
+        if (!this.anySourceConfigured) {
+          this.discoveryModalOpen = false;
+          this.discoveryStatus = 'Not configured yet — set BANDSINTOWN_APP_ID or TICKETMASTER_API_KEY in your stack to use this.';
+          SR.toast('Not configured yet — set a Bandsintown or Ticketmaster key in your stack.');
+          this.discovering = false;
+          return;
+        }
+        if (r.onCooldown) {
+          this.discoveryModalOpen = false;
+          this.discoveryStatus = this.cooldownMessage();
+          SR.toast('Already searched in the last 48 hours — try again later.');
+          this.discovering = false;
+          return;
+        }
+        this.discoveryRunFound += r.foundThisChunk || 0;
+        this.discoveryProgress = { processed: r.artistsProcessed || 0, total: r.artistsTotal || 0 };
+        if (r.foundThisChunk) await Promise.all([this.load(), this.loadList()]);
+        if (r.more) {
+          this.pollDiscoveryProgress();
+        } else {
+          await this.finishDiscovery(r.totalFound ?? r.foundThisChunk ?? 0);
+        }
+      } catch (e) {
+        this.discoveryModalOpen = false;
+        this.discovering = false;
+        SR.toast(e.message);
+      }
+    },
+    pollDiscoveryProgress() {
+      if (this.discoveryPollTimer) return;
+      this.discoveryPollTimer = setInterval(async () => {
+        try {
+          const r = await SR.api('/tour-dates/discover');
+          this.applyConfigured(r);
+          if (r.phase === 'scanning') {
+            this.discoveryProgress = { processed: r.artist_cursor || 0, total: r.artists_total || 0 };
+          } else {
+            clearInterval(this.discoveryPollTimer);
+            this.discoveryPollTimer = null;
+            const found = (r.last_result && r.last_result.totalFound) || 0;
+            await this.finishDiscovery(found);
+          }
+        } catch (e) { /* transient poll failure - try again on the next tick */ }
+      }, 4000);
+    },
+    async finishDiscovery(found) {
+      this.discovering = false;
+      this.discoveryPhase = 'done';
+      this.discoveryRunFound = found;
+      if (found) await Promise.all([this.load(), this.loadList()]);
+      await this.loadDiscoveryStatus(); // scan just completed - refresh the 48h cooldown now in effect
+    },
+    closeDiscoveryModal() {
+      this.discoveryModalOpen = false;
+      if (this.discoveryPollTimer) { clearInterval(this.discoveryPollTimer); this.discoveryPollTimer = null; }
+    },
+    async loadArtists() {
+      try { const r = await SR.api('/artists'); this.allArtists = r.artists || []; } catch (e) {}
+    },
+    get monthLabel() {
+      return this.cursor.toLocaleDateString(undefined, { month: 'long', year: 'numeric' });
+    },
+    gridRange() {
+      const year = this.cursor.getFullYear(), month = this.cursor.getMonth();
+      const first = new Date(year, month, 1);
+      const start = new Date(first);
+      start.setDate(first.getDate() - first.getDay());
+      const last = new Date(year, month + 1, 0);
+      const end = new Date(last);
+      end.setDate(last.getDate() + (6 - last.getDay()));
+      return { start, end };
+    },
+    fmt(d) {
+      const y = d.getFullYear(), m = String(d.getMonth() + 1).padStart(2, '0'), day = String(d.getDate()).padStart(2, '0');
+      return y + '-' + m + '-' + day;
+    },
+    get cells() {
+      const { start, end } = this.gridRange();
+      const month = this.cursor.getMonth();
+      const todayKey = this.fmt(new Date());
+      const byDate = {};
+      for (const ev of this.events) (byDate[ev.event_date] = byDate[ev.event_date] || []).push(ev);
+      const out = [];
+      const d = new Date(start);
+      while (d <= end) {
+        const key = this.fmt(d);
+        out.push({ key, day: d.getDate(), inMonth: d.getMonth() === month, isToday: key === todayKey, events: byDate[key] || [] });
+        d.setDate(d.getDate() + 1);
+      }
+      return out;
+    },
+    async load() {
+      this.loading = true;
+      try {
+        const { start, end } = this.gridRange();
+        const r = await SR.api('/tour-dates?from=' + this.fmt(start) + '&to=' + this.fmt(end));
+        this.events = r.tour_dates || [];
+      } catch (e) { SR.toast(e.message); }
+      this.loading = false;
+    },
+    async loadList() {
+      this.listLoading = true;
+      try {
+        const params = new URLSearchParams();
+        if (this.statusFilter) params.set('status', this.statusFilter);
+        if (this.includePast) params.set('all', '1');
+        const qs = params.toString();
+        const r = await SR.api('/tour-dates' + (qs ? '?' + qs : ''));
+        this.allDates = (r.tour_dates || []).slice().sort((a, b) => a.event_date < b.event_date ? -1 : a.event_date > b.event_date ? 1 : 0);
+      } catch (e) { SR.toast(e.message); }
+      this.listLoading = false;
+    },
+    get groupedMonths() {
+      const groups = {};
+      for (const td of this.allDates) {
+        const key = String(td.event_date).slice(0, 7);
+        if (!groups[key]) groups[key] = [];
+        groups[key].push(td);
+      }
+      return Object.keys(groups).sort().map(key => {
+        const [y, m] = key.split('-').map(Number);
+        const label = new Date(y, m - 1, 1).toLocaleDateString(undefined, { month: 'long', year: 'numeric' });
+        return { key, label, dates: groups[key] };
+      });
+    },
+    toggleMonth(key) { this.expanded[key] = !this.expanded[key]; },
+    isExpanded(key) { return !!this.expanded[key]; },
+    prevMonth() { this.cursor = new Date(this.cursor.getFullYear(), this.cursor.getMonth() - 1, 1); this.load(); },
+    nextMonth() { this.cursor = new Date(this.cursor.getFullYear(), this.cursor.getMonth() + 1, 1); this.load(); },
+    goToday() { this.cursor = new Date(); this.load(); },
+    statusPillClass(status) {
+      return {
+        new: '', applied: 'cal-event-applied', awaiting: 'cal-event-awaiting',
+        approved: 'cal-event-approved', denied: 'cal-event-denied',
+      }[status] || '';
+    },
+    openAdd() {
+      this.editingId = null;
+      this.form = { artist_name: '', event_date: this.fmt(new Date()), venue: '', city: '', ticket_url: '', status: 'new' };
+      this.formOpen = true;
+    },
+    openEdit(td) {
+      this.editingId = td.id;
+      this.form = { artist_name: td.artist_name, event_date: td.event_date, venue: td.venue || '', city: td.city || '', ticket_url: td.ticket_url || '', status: td.status };
+      this.formOpen = true;
+    },
+    async save() {
+      const name = (this.form.artist_name || '').trim();
+      const artist = this.allArtists.find(a => a.name.toLowerCase() === name.toLowerCase());
+      if (!artist) { SR.toast('Pick an existing artist from the list.'); return; }
+      this.saving = true;
+      try {
+        const body = { artist_id: artist.id, event_date: this.form.event_date, venue: this.form.venue, city: this.form.city, ticket_url: this.form.ticket_url, status: this.form.status };
+        if (this.editingId) await SR.api('/tour-dates/' + this.editingId, { method: 'PUT', body });
+        else await SR.api('/tour-dates', { method: 'POST', body });
+        this.formOpen = false;
+        await Promise.all([this.load(), this.loadList()]);
+        SR.toast('Saved.');
+      } catch (e) { SR.toast(e.message); }
+      this.saving = false;
+    },
+    async quickStatus(td, status) {
+      const prev = td.status;
+      td.status = status;
+      const ev = this.events.find(x => x.id === td.id);
+      if (ev) ev.status = status;
+      try {
+        await SR.api('/tour-dates/' + td.id, { method: 'PUT', body: { event_date: td.event_date, venue: td.venue, city: td.city, ticket_url: td.ticket_url, status } });
+      } catch (e) { td.status = prev; if (ev) ev.status = prev; SR.toast(e.message); }
+    },
+    async remove(td) {
+      if (!confirm('Remove this tour date?')) return;
+      try {
+        await SR.api('/tour-dates/' + td.id, { method: 'DELETE' });
+        this.allDates = this.allDates.filter(x => x.id !== td.id);
+        this.events = this.events.filter(x => x.id !== td.id);
+      } catch (e) { SR.toast(e.message); }
+    },
+  };
+}
+</script>
+</body>
+</html>

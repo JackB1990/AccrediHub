@@ -1,0 +1,81 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex,nofollow">
+<title>Sign in — AccrediHub</title>
+<link rel="stylesheet" href="/theme.css">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Sora:wght@600;700;800&display=swap" rel="stylesheet">
+<style>
+  body {
+    min-height: 100vh; display: flex; align-items: center; justify-content: center;
+    background: radial-gradient(circle at 20% 15%, rgba(166,104,228,.22), transparent 45%),
+                radial-gradient(circle at 85% 80%, rgba(126,75,208,.16), transparent 45%),
+                var(--bg);
+  }
+  main { width: 100%; max-width: 360px; padding: 20px; }
+  .lg-mark { width: 52px; height: 52px; border-radius: 16px; background: var(--accent-gradient);
+    display:flex; align-items:center; justify-content:center; margin: 0 auto 20px; box-shadow: 0 10px 30px rgba(166,104,228,.35); }
+  .lg-mark svg { width: 26px; height: 26px; }
+  h1 { font-family: var(--display); font-size: 24px; text-align: center; margin: 0 0 6px; }
+  .sub { font-size: 14px; color: var(--text-dim); text-align: center; margin: 0 0 26px; }
+  input, button { box-sizing: border-box; width: 100%; height: 46px; }
+  input { border-radius: var(--radius-sm); padding: 0 14px; margin-bottom: 10px; }
+  button[type="submit"] {
+    margin-top: 8px; border: 0; cursor: pointer; font-weight: 700; font-size: 14.5px;
+    border-radius: var(--radius-pill); background: var(--accent-gradient); color: #fff;
+  }
+  button[type="submit"]:disabled { opacity: .55; }
+  .msg { font-size: 13.5px; margin-top: 14px; min-height: 1em; text-align: center; color: var(--text-dim); }
+  .msg.err { color: #ff8f96; }
+  .lg-logo { display:block; width:100%; max-width:340px; height:auto; margin:0 auto 22px; border-radius:14px; }
+</style>
+</head>
+<body>
+<main>
+  <img class="lg-logo" src="/logo.png" alt="AccrediHub — Bands / PR / Press Accreditation">
+  <h1>Sign in to AccrediHub</h1>
+  <p class="sub">Enter the admin credentials set for this server.</p>
+  <form id="form" novalidate>
+    <input id="username" name="username" type="text" class="input" placeholder="Username" autocomplete="username" autocapitalize="off" spellcheck="false" aria-label="Username" value="admin">
+    <input id="password" name="password" type="password" class="input" placeholder="Password" autocomplete="current-password" aria-label="Password">
+    <button id="submit" type="submit">Sign in</button>
+  </form>
+  <p class="msg" id="msg" role="status" aria-live="polite"></p>
+</main>
+<script>
+(function () {
+  var form = document.getElementById('form');
+  var msg = document.getElementById('msg');
+  var submit = document.getElementById('submit');
+  var pw = document.getElementById('password');
+  function safeNext() {
+    var raw = new URLSearchParams(location.search).get('next') || '/index.html';
+    if (raw.charAt(0) !== '/' || raw.indexOf('//') === 0) return '/index.html';
+    return raw;
+  }
+  function say(t, err) { msg.textContent = t || ''; msg.className = 'msg' + (err ? ' err' : ''); }
+  fetch('/api/auth/session', { credentials: 'same-origin' }).then(function (r) { return r.json(); })
+    .then(function (s) { if (s && s.user) location.replace(safeNext()); }).catch(function () {});
+  form.addEventListener('submit', function (e) {
+    e.preventDefault();
+    submit.disabled = true; say('');
+    fetch('/api/auth/login', {
+      method: 'POST', credentials: 'same-origin',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ username: document.getElementById('username').value.trim(), password: pw.value })
+    }).then(function (r) { return r.json().then(function (d) { return { ok: r.ok, d: d }; }); })
+      .then(function (x) {
+        if (x.ok && x.d.user) { location.replace(safeNext()); return; }
+        say((x.d && x.d.error) || 'Sign-in failed.', true);
+      })
+      .catch(function () { say('Could not reach the server.', true); })
+      .then(function () { submit.disabled = false; });
+  });
+  pw.focus();
+})();
+</script>
+</body>
+</html>

@@ -1,0 +1,271 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>PR Agency — AccrediHub</title>
+<link rel="stylesheet" href="/theme.css">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Sora:wght@600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<script src="https://cdn.tailwindcss.com"></script>
+<script src="/app.js"></script>
+<script src="https://unpkg.com/alpinejs@3.x.x/dist/cdn.min.js" defer></script>
+</head>
+<body>
+<div class="app-shell">
+  <nav class="sidebar" id="sidebar"></nav>
+
+  <main class="main" x-data="prAgentPage()" x-init="init()" x-cloak>
+    <template x-if="loading"><div class="page-sub">Loading agency…</div></template>
+
+    <template x-if="!loading && !agency">
+      <div class="empty-state panel"><p>PR agency not found.</p></div>
+    </template>
+
+    <template x-if="!loading && agency">
+      <div>
+        <div class="hero-panel fade-in" style="display:flex;gap:24px;align-items:center;margin-bottom:32px;flex-wrap:wrap">
+          <div class="artist-photo" style="width:130px"><span x-text="SR.initials(agency.company)"></span></div>
+          <div style="flex:1;min-width:220px">
+            <div class="page-title" x-text="agency.company"></div>
+            <p class="page-sub" style="max-width:560px;margin-top:8px" x-text="agency.notes || 'No notes yet.'"></p>
+          </div>
+          <button class="btn btn-ghost" @click="openEditAgency()">Edit agency</button>
+        </div>
+
+        <div class="section">
+          <div class="section-head">
+            <div class="section-title">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" width="18" height="18"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+              Contacts
+            </div>
+            <button class="btn btn-ghost btn-sm" @click="openAddContact()">Add contact</button>
+          </div>
+          <template x-if="agency.contacts.length === 0">
+            <div class="panel" style="color:var(--text-faint);font-size:13.5px">No contacts yet.</div>
+          </template>
+          <template x-for="c in agency.contacts" :key="c.id">
+            <div class="track-row">
+              <div class="art" style="width:44px;height:44px;border-radius:10px">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" width="18" height="18"><circle cx="12" cy="8" r="4"/><path d="M4 20c0-4 3.6-6 8-6s8 2 8 6"/></svg>
+              </div>
+              <div class="track-main">
+                <div class="track-title" x-text="c.name"></div>
+                <div class="track-meta" x-text="[c.email, c.phone].filter(Boolean).join(' · ') || 'No contact details'"></div>
+              </div>
+              <div class="track-actions">
+                <template x-if="c.email">
+                  <a :href="'mailto:' + c.email" class="icon-btn" title="Email">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 4h16v16H4z"/><path d="m4 6 8 7 8-7"/></svg>
+                  </a>
+                </template>
+                <div class="icon-btn" @click="openEditContact(c)" title="Edit">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg>
+                </div>
+                <div class="icon-btn" @click="removeContact(c)" title="Remove">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+                </div>
+              </div>
+            </div>
+          </template>
+        </div>
+
+        <div class="section">
+          <div class="section-head">
+            <div class="section-title">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" width="18" height="18"><path d="M17 21v-2a4 4 0 0 0-4-4H7a4 4 0 0 0-4 4v2"/><circle cx="10" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+              Artists represented
+            </div>
+            <button class="btn btn-ghost btn-sm" @click="openLinkArtist()">Link artist</button>
+          </div>
+          <template x-if="agency.artists.length === 0">
+            <div class="panel" style="color:var(--text-faint);font-size:13.5px">No artists linked yet.</div>
+          </template>
+          <template x-for="l in agency.artists" :key="l.id">
+            <div class="track-row">
+              <a :href="'/artist.html?id=' + l.artist_id" class="art" style="width:44px;height:44px;border-radius:50%">
+                <span x-text="SR.initials(l.artist_name)"></span>
+              </a>
+              <div class="track-main">
+                <div class="track-title"><a :href="'/artist.html?id=' + l.artist_id" x-text="l.artist_name"></a></div>
+                <div class="track-meta" x-text="l.contact_name ? ('Contact: ' + l.contact_name) : 'No named contact'"></div>
+              </div>
+              <div class="track-actions">
+                <div class="icon-btn" @click="removeLink(l)" title="Unlink">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+                </div>
+              </div>
+            </div>
+          </template>
+        </div>
+      </div>
+    </template>
+
+    <!-- Edit agency modal -->
+    <div class="modal-backdrop" x-show="editOpen" x-cloak @click.self="editOpen = false">
+      <div class="modal">
+        <div class="modal-title">Edit PR Agency</div>
+        <form @submit.prevent="saveAgency()">
+          <label class="field-label">Company name</label>
+          <input class="input" style="margin-bottom:14px" x-model="editForm.company" required placeholder="Agency name">
+          <label class="field-label">Notes (optional)</label>
+          <textarea class="input" style="margin-bottom:16px;min-height:70px" x-model="editForm.notes"></textarea>
+          <div style="display:flex;justify-content:space-between;gap:10px">
+            <button type="button" class="btn btn-danger" @click="deleteAgency()">Delete agency</button>
+            <div style="display:flex;gap:10px">
+              <button type="button" class="btn btn-ghost" @click="editOpen = false">Cancel</button>
+              <button type="submit" class="btn btn-primary" :disabled="saving" x-text="saving ? 'Saving…' : 'Save'"></button>
+            </div>
+          </div>
+        </form>
+      </div>
+    </div>
+
+    <!-- Add/edit contact modal -->
+    <div class="modal-backdrop" x-show="contactFormOpen" x-cloak @click.self="contactFormOpen = false">
+      <div class="modal">
+        <div class="modal-title" x-text="editingContactId ? 'Edit Contact' : 'Add Contact'"></div>
+        <form @submit.prevent="saveContact()">
+          <label class="field-label">Name</label>
+          <input class="input" style="margin-bottom:14px" x-model="contactForm.name" required placeholder="Contact name">
+          <label class="field-label">Email (optional)</label>
+          <input class="input" style="margin-bottom:14px" x-model="contactForm.email" placeholder="name@agency.com">
+          <label class="field-label">Phone (optional)</label>
+          <input class="input" style="margin-bottom:16px" x-model="contactForm.phone" placeholder="+44…">
+          <div style="display:flex;justify-content:flex-end;gap:10px">
+            <button type="button" class="btn btn-ghost" @click="contactFormOpen = false">Cancel</button>
+            <button type="submit" class="btn btn-primary" :disabled="saving" x-text="saving ? 'Saving…' : 'Save'"></button>
+          </div>
+        </form>
+      </div>
+    </div>
+
+    <!-- Link artist modal -->
+    <div class="modal-backdrop" x-show="linkFormOpen" x-cloak @click.self="linkFormOpen = false">
+      <div class="modal">
+        <div class="modal-title">Link Artist</div>
+        <form @submit.prevent="saveLink()">
+          <label class="field-label">Artist</label>
+          <input class="input" style="margin-bottom:14px" x-model="linkForm.artist_name" required placeholder="Artist name" list="artist-suggestions">
+          <datalist id="artist-suggestions">
+            <template x-for="a in allArtists" :key="a.id"><option :value="a.name"></option></template>
+          </datalist>
+          <label class="field-label">Contact at this agency (optional)</label>
+          <select class="input" style="margin-bottom:14px" x-model="linkForm.contact_id">
+            <option value="">No specific contact</option>
+            <template x-for="c in (agency ? agency.contacts : [])" :key="c.id">
+              <option :value="c.id" x-text="c.name"></option>
+            </template>
+          </select>
+          <label class="field-label">Notes (optional)</label>
+          <textarea class="input" style="margin-bottom:16px;min-height:60px" x-model="linkForm.notes"></textarea>
+          <div style="display:flex;justify-content:flex-end;gap:10px">
+            <button type="button" class="btn btn-ghost" @click="linkFormOpen = false">Cancel</button>
+            <button type="submit" class="btn btn-primary" :disabled="saving" x-text="saving ? 'Saving…' : 'Save'"></button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </main>
+</div>
+
+<script>
+function prAgentPage() {
+  const id = new URLSearchParams(location.search).get('id');
+  return {
+    id, agency: null, allArtists: [], loading: true, saving: false,
+    editOpen: false, editForm: { company: '', notes: '' },
+    contactFormOpen: false, editingContactId: null, contactForm: { name: '', email: '', phone: '' },
+    linkFormOpen: false, linkForm: { artist_name: '', contact_id: '', notes: '' },
+
+    async init() {
+      const user = await SR.requireAuth();
+      if (!user) return;
+      SR.mountSidebar('pr', user);
+      await this.loadArtists();
+      await this.load();
+    },
+    async loadArtists() {
+      try { const r = await SR.api('/artists'); this.allArtists = r.artists || []; } catch (e) {}
+    },
+    async load() {
+      this.loading = true;
+      try {
+        const r = await SR.api('/pr-agencies/' + this.id);
+        this.agency = r.agency;
+      } catch (e) { SR.toast(e.message); }
+      this.loading = false;
+    },
+
+    openEditAgency() {
+      this.editForm = { company: this.agency.company, notes: this.agency.notes || '' };
+      this.editOpen = true;
+    },
+    async saveAgency() {
+      this.saving = true;
+      try {
+        await SR.api('/pr-agencies/' + this.id, { method: 'PUT', body: this.editForm });
+        this.editOpen = false;
+        await this.load();
+        SR.toast('Saved.');
+      } catch (e) { SR.toast(e.message); }
+      this.saving = false;
+    },
+    async deleteAgency() {
+      if (!confirm('Delete “' + this.agency.company + '” and all its contacts and links?')) return;
+      try {
+        await SR.api('/pr-agencies/' + this.id, { method: 'DELETE' });
+        location.href = '/pr-agents.html';
+      } catch (e) { SR.toast(e.message); }
+    },
+
+    openAddContact() { this.editingContactId = null; this.contactForm = { name: '', email: '', phone: '' }; this.contactFormOpen = true; },
+    openEditContact(c) { this.editingContactId = c.id; this.contactForm = { name: c.name, email: c.email || '', phone: c.phone || '' }; this.contactFormOpen = true; },
+    async saveContact() {
+      this.saving = true;
+      try {
+        if (this.editingContactId) {
+          await SR.api('/pr-contacts/' + this.editingContactId, { method: 'PUT', body: this.contactForm });
+        } else {
+          await SR.api('/pr-contacts', { method: 'POST', body: { agency_id: this.id, ...this.contactForm } });
+        }
+        this.contactFormOpen = false;
+        await this.load();
+        SR.toast('Saved.');
+      } catch (e) { SR.toast(e.message); }
+      this.saving = false;
+    },
+    async removeContact(c) {
+      if (!confirm('Remove this contact?')) return;
+      try { await SR.api('/pr-contacts/' + c.id, { method: 'DELETE' }); await this.load(); } catch (e) { SR.toast(e.message); }
+    },
+
+    openLinkArtist() {
+      this.linkForm = { artist_name: '', contact_id: '', notes: '' };
+      this.linkFormOpen = true;
+    },
+    async saveLink() {
+      const name = (this.linkForm.artist_name || '').trim();
+      const artist = this.allArtists.find(a => a.name.toLowerCase() === name.toLowerCase());
+      if (!artist) { SR.toast('Pick an existing artist from the list.'); return; }
+      this.saving = true;
+      try {
+        await SR.api('/artist-pr-contacts', { method: 'POST', body: {
+          artist_id: artist.id, agency_id: this.id,
+          contact_id: this.linkForm.contact_id || null, notes: this.linkForm.notes,
+        }});
+        this.linkFormOpen = false;
+        await this.load();
+        SR.toast('Linked.');
+      } catch (e) { SR.toast(e.message); }
+      this.saving = false;
+    },
+    async removeLink(l) {
+      if (!confirm('Unlink ' + l.artist_name + ' from this agency?')) return;
+      try { await SR.api('/artist-pr-contacts/' + l.id, { method: 'DELETE' }); await this.load(); } catch (e) { SR.toast(e.message); }
+    },
+  };
+}
+</script>
+</body>
+</html>

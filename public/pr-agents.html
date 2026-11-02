@@ -1,0 +1,114 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>PR Agents — AccrediHub</title>
+<link rel="stylesheet" href="/theme.css">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Sora:wght@600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<script src="https://cdn.tailwindcss.com"></script>
+<script src="/app.js"></script>
+<script src="https://unpkg.com/alpinejs@3.x.x/dist/cdn.min.js" defer></script>
+</head>
+<body>
+<div class="app-shell">
+  <nav class="sidebar" id="sidebar"></nav>
+
+  <main class="main" x-data="prAgentsPage()" x-init="init()" x-cloak>
+    <div class="page-head">
+      <div>
+        <div class="page-title">PR Agents</div>
+        <div class="page-sub" x-text="loading ? 'Loading…' : (agencies.length + ' agenc' + (agencies.length === 1 ? 'y' : 'ies'))"></div>
+      </div>
+      <button class="btn btn-primary" @click="openAdd()">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+        Add PR Agency
+      </button>
+    </div>
+
+    <div style="display:flex;gap:14px;flex-wrap:wrap;margin-bottom:26px">
+      <div class="search-wrap" style="max-width:420px;flex:1">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+        <input class="input" placeholder="Search agencies…" x-model="q">
+      </div>
+    </div>
+
+    <template x-if="!loading && agencies.length === 0">
+      <div class="empty-state panel"><p>No PR agencies yet — add one to get started.</p></div>
+    </template>
+
+    <template x-if="!loading && agencies.length > 0 && filteredAgencies.length === 0">
+      <div class="empty-state panel"><p x-text="'No agencies match “' + q + '”.'"></p></div>
+    </template>
+
+    <div class="grid">
+      <template x-for="ag in filteredAgencies" :key="ag.id">
+        <a class="artist-card fade-in" :href="'/pr-agent.html?id=' + ag.id">
+          <div class="artist-photo"><span x-text="SR.initials(ag.company)"></span></div>
+          <div class="artist-card-name" x-text="ag.company"></div>
+          <div class="artist-card-count" x-text="ag.contacts.length + ' contact' + (ag.contacts.length === 1 ? '' : 's') + ' · ' + ag.artists.length + ' artist' + (ag.artists.length === 1 ? '' : 's')"></div>
+        </a>
+      </template>
+    </div>
+
+    <!-- Add agency modal -->
+    <div class="modal-backdrop" x-show="formOpen" x-cloak @click.self="formOpen = false">
+      <div class="modal">
+        <div class="modal-title">Add PR Agency</div>
+        <form @submit.prevent="save()">
+          <label class="field-label">Company name</label>
+          <input class="input" style="margin-bottom:14px" x-model="form.company" required placeholder="Agency name">
+          <label class="field-label">Notes (optional)</label>
+          <textarea class="input" style="margin-bottom:16px;min-height:70px" x-model="form.notes"></textarea>
+          <div style="display:flex;justify-content:flex-end;gap:10px">
+            <button type="button" class="btn btn-ghost" @click="formOpen = false">Cancel</button>
+            <button type="submit" class="btn btn-primary" :disabled="saving" x-text="saving ? 'Saving…' : 'Save'"></button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </main>
+</div>
+
+<script>
+function prAgentsPage() {
+  return {
+    agencies: [], q: '', loading: true, saving: false,
+    formOpen: false, form: { company: '', notes: '' },
+
+    async init() {
+      const user = await SR.requireAuth();
+      if (!user) return;
+      SR.mountSidebar('pr', user);
+      await this.load();
+    },
+    get filteredAgencies() {
+      const q = this.q.trim().toLowerCase();
+      if (!q) return this.agencies;
+      return this.agencies.filter(ag => ag.company.toLowerCase().includes(q));
+    },
+    async load() {
+      this.loading = true;
+      try {
+        const r = await SR.api('/pr-agencies');
+        this.agencies = r.agencies || [];
+      } catch (e) { SR.toast(e.message); }
+      this.loading = false;
+    },
+    openAdd() { this.form = { company: '', notes: '' }; this.formOpen = true; },
+    async save() {
+      this.saving = true;
+      try {
+        const r = await SR.api('/pr-agencies', { method: 'POST', body: this.form });
+        this.formOpen = false;
+        if (r.agency) location.href = '/pr-agent.html?id=' + r.agency.id;
+        else await this.load();
+      } catch (e) { SR.toast(e.message); }
+      this.saving = false;
+    },
+  };
+}
+</script>
+</body>
+</html>

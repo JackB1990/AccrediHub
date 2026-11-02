@@ -1,0 +1,12 @@
+{
+  "name": "accredihub",
+  "version": "1.0.0",
+  "description": "AccrediHub - a self-hosted song database and playlist builder for radio shows.",
+  "private": true,
+  "type": "module",
+  "engines": { "node": ">=22.13" },
+  "scripts": {
+    "start": "node --disable-warning=ExperimentalWarning server/index.js",
+    "dev": "node --disable-warning=ExperimentalWarning --watch server/index.js"
+  }
+}

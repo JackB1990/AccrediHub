@@ -1,0 +1,118 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Playlist — AccrediHub</title>
+<link rel="stylesheet" href="/theme.css">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Sora:wght@600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<script src="https://cdn.tailwindcss.com"></script>
+<script src="/app.js"></script>
+<script src="https://unpkg.com/alpinejs@3.x.x/dist/cdn.min.js" defer></script>
+</head>
+<body>
+<div class="app-shell">
+  <nav class="sidebar" id="sidebar"></nav>
+
+  <main class="main" x-data="playlistViewPage()" x-init="init()" x-cloak>
+    <template x-if="loading"><div class="page-sub">Loading…</div></template>
+
+    <template x-if="!loading && !playlist">
+      <div class="empty-state panel"><p>Playlist not found.</p></div>
+    </template>
+
+    <template x-if="!loading && playlist">
+      <div>
+        <div class="page-head">
+          <div>
+            <div class="page-title" x-text="playlist.name"></div>
+            <div class="page-sub">
+              <span x-text="SR.fmtDate(playlist.show_date) || 'No date set'"></span>
+              <template x-if="playlist.theme"><span> · Theme: <span x-text="playlist.theme"></span></span></template>
+            </div>
+          </div>
+          <div style="display:flex;gap:10px">
+            <a :href="'/playlist-builder.html?id=' + playlist.id" class="btn btn-ghost">Continue editing</a>
+            <button class="btn btn-danger" @click="remove()">Delete playlist</button>
+          </div>
+        </div>
+
+        <div class="panel">
+          <template x-if="items.length === 0"><div style="color:var(--text-faint);font-size:13.5px">This playlist is empty.</div></template>
+          <template x-for="(it, idx) in items" :key="it.id">
+            <div class="track-row" :class="it.item_type === 'note' ? SR.noteCategoryBoxClass(it.category) : ''" :style="idx === items.length - 1 && 'margin-bottom:0'">
+              <div class="track-col" style="min-width:26px;text-align:left;color:var(--text-faint)" x-text="idx + 1"></div>
+              <template x-if="it.item_type === 'track'">
+                <div class="art" :style="it.album_art_url ? 'background-image:url(' + it.album_art_url + ')' : ''"></div>
+              </template>
+              <template x-if="it.item_type === 'note'">
+                <div class="art" style="background:rgba(255,255,255,.08);color:#fff">📝</div>
+              </template>
+              <div class="track-main">
+                <template x-if="it.item_type === 'track'">
+                  <div>
+                    <div class="track-title" x-text="it.title"></div>
+                    <div class="track-meta">
+                      <a :href="'/artist.html?id=' + it.artist_id" x-text="it.artist_name"></a>
+                      <template x-if="it.album_name"><span> · <span x-text="it.album_name"></span></span></template>
+                    </div>
+                  </div>
+                </template>
+                <template x-if="it.item_type === 'note'">
+                  <div style="flex:1">
+                    <div class="track-title" style="display:flex;align-items:center;gap:7px">
+                      <span x-text="it.note_title"></span>
+                      <span class="pill" :class="SR.noteCategoryPillClass(it.category)" x-show="it.category" x-text="SR.noteCategoryLabel(it.category)"></span>
+                    </div>
+                    <div class="track-meta" x-show="it.note_body" x-text="it.note_body"></div>
+                    <template x-if="(it.category === 'new_tour_announcement' || it.category === 'band_on_tour') && it.note_tour_dates && it.note_tour_dates.length">
+                      <div style="margin-top:8px;border:1px solid var(--border);border-radius:10px;padding:2px 10px;max-width:420px">
+                        <template x-for="d in it.note_tour_dates" :key="d.event_date + (d.venue || '') + (d.city || '')">
+                          <div style="display:flex;justify-content:space-between;gap:10px;font-size:12.5px;padding:6px 0;border-bottom:1px solid var(--border)">
+                            <span x-text="SR.fmtDate(d.event_date)" style="flex-shrink:0;font-weight:600"></span>
+                            <span x-text="(d.venue || 'Venue TBA') + (d.city ? ', ' + d.city : '')" style="text-align:right"></span>
+                          </div>
+                        </template>
+                      </div>
+                    </template>
+                  </div>
+                </template>
+              </div>
+              <template x-if="it.item_type === 'track'"><div class="track-col" x-text="SR.fmtDate(it.release_date) || '—'"></div></template>
+            </div>
+          </template>
+        </div>
+      </div>
+    </template>
+  </main>
+</div>
+
+<script>
+function playlistViewPage() {
+  const id = new URLSearchParams(location.search).get('id');
+  return {
+    id, playlist: null, items: [], loading: true,
+    async init() {
+      const user = await SR.requireAuth();
+      if (!user) return;
+      SR.mountSidebar('playlists', user);
+      try {
+        const r = await SR.api('/playlists/' + this.id);
+        this.playlist = r.playlist;
+        this.items = r.items || [];
+      } catch (e) { SR.toast(e.message); }
+      this.loading = false;
+    },
+    async remove() {
+      if (!confirm('Delete “' + this.playlist.name + '”? This cannot be undone.')) return;
+      try {
+        await SR.api('/playlists/' + this.id, { method: 'DELETE' });
+        location.href = '/playlists.html';
+      } catch (e) { SR.toast(e.message); }
+    },
+  };
+}
+</script>
+</body>
+</html>
